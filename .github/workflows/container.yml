@@ -6,7 +6,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
     inputs:
       channel:
@@ -20,11 +20,11 @@ on:
       version:
         description: Version without arch suffix, for example 0.1.0
         required: false
-        default: ''
+        default: ""
       arches:
-        description: Comma-separated arches to build: amd64, arm64, or amd64,arm64
+        description: "Comma-separated arches to build: amd64, arm64, or amd64,arm64"
         required: false
-        default: ''
+        default: ""
 
 permissions:
   contents: read
@@ -106,30 +106,40 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            echo "channel=local" >> "$GITHUB_OUTPUT"
-            echo "version=${{ needs.plan.outputs.version }}" >> "$GITHUB_OUTPUT"
-            echo "push=false" >> "$GITHUB_OUTPUT"
-            echo "load=${{ steps.arch.outputs.scan_local }}" >> "$GITHUB_OUTPUT"
+            {
+              echo "channel=local"
+              echo "version=${{ needs.plan.outputs.version }}"
+              echo "push=false"
+              echo "load=${{ steps.arch.outputs.scan_local }}"
+            } >> "$GITHUB_OUTPUT"
           elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            echo "channel=release" >> "$GITHUB_OUTPUT"
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-            echo "push=true" >> "$GITHUB_OUTPUT"
-            echo "load=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "channel=release"
+              echo "version=${GITHUB_REF_NAME#v}"
+              echo "push=true"
+              echo "load=false"
+            } >> "$GITHUB_OUTPUT"
           elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${{ github.event.inputs.channel }}" == "release" ]]; then
-            echo "channel=release" >> "$GITHUB_OUTPUT"
-            echo "version=${{ needs.plan.outputs.version }}" >> "$GITHUB_OUTPUT"
-            echo "push=true" >> "$GITHUB_OUTPUT"
-            echo "load=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "channel=release"
+              echo "version=${{ needs.plan.outputs.version }}"
+              echo "push=true"
+              echo "load=false"
+            } >> "$GITHUB_OUTPUT"
           elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            echo "channel=dev" >> "$GITHUB_OUTPUT"
-            echo "version=${{ needs.plan.outputs.version }}" >> "$GITHUB_OUTPUT"
-            echo "push=true" >> "$GITHUB_OUTPUT"
-            echo "load=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "channel=dev"
+              echo "version=${{ needs.plan.outputs.version }}"
+              echo "push=true"
+              echo "load=false"
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "channel=dev" >> "$GITHUB_OUTPUT"
-            echo "version=${{ needs.plan.outputs.version }}" >> "$GITHUB_OUTPUT"
-            echo "push=true" >> "$GITHUB_OUTPUT"
-            echo "load=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "channel=dev"
+              echo "version=${{ needs.plan.outputs.version }}"
+              echo "push=true"
+              echo "load=false"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Login to Docker Hub
