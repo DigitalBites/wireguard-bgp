@@ -155,10 +155,10 @@ func (m *serverWGManagerTestDouble) Restart(ctx context.Context) (string, error)
 
 func validWGConfig() string {
 	return `[Interface]
-PrivateKey = private-value
+PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 
 [Peer]
-PublicKey = abcdefghijklmnopqrstuvwxyz1234567890
+PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 Endpoint = 172.17.62.1:51820
 AllowedIPs = 0.0.0.0/0
 `

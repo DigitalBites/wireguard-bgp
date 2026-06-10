@@ -89,6 +89,15 @@ func ValidateManagedPaths(cfg App) error {
 	if err := requirePathInside(cfg.ConfigDir, cfg.BIRDConfigPath, "BIRD config path"); err != nil {
 		return err
 	}
+	if err := bird.ValidateInterfaceName(cfg.WireGuard.Interface); err != nil {
+		return fmt.Errorf("wireguard interface is invalid: %w", err)
+	}
+	if cfg.WireGuard.MTU < 576 || cfg.WireGuard.MTU > 9000 {
+		return fmt.Errorf("wireguard MTU must be 576-9000")
+	}
+	if err := bird.ValidateInterfaceName(cfg.BIRD.WithDefaults().Interface); err != nil {
+		return fmt.Errorf("BIRD interface is invalid: %w", err)
+	}
 	return nil
 }
 

@@ -39,7 +39,8 @@ func webStatic() embed.FS {
 func addTestSession(t *testing.T, srv *Server, req *http.Request) string {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	loginReq := httptest.NewRequest(http.MethodGet, "/login?token=test-token", nil)
+	loginReq := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("token=test-token"))
+	loginReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	srv.Handler().ServeHTTP(rec, loginReq)
 	cookie := findCookie(rec.Result().Cookies(), "peplink_session")
 	if cookie == nil {

@@ -57,9 +57,9 @@ func (s *Server) postWGConfig(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	meta := wg.ParseConfig(string(data))
-	if !meta.HasPrivateKey || meta.PeerPublicKey == "" {
-		http.Error(w, "wireguard config must include interface private key and peer public key", http.StatusBadRequest)
+	meta, err := wg.ValidateConfig(string(data))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	path := s.wgConfigPath()

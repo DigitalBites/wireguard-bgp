@@ -111,10 +111,71 @@ func TestSupervisorPing(t *testing.T) {
 	}
 }
 
+func TestSupervisorAllowsConfiguredPeerUID(t *testing.T) {
+	socketPath := filepath.Join(t.TempDir(), "supervisor.sock")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- (Server{SocketPath: socketPath, AllowedUID: os.Getuid()}).Serve(ctx)
+	}()
+	waitForSocket(t, socketPath)
+	resp, err := (Client{SocketPath: socketPath, Timeout: time.Second}).Call(context.Background(), ActionPing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resp.OK {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+	cancel()
+	assertServerStopped(t, errCh)
+}
+
+func TestSupervisorRejectsUnexpectedPeerUID(t *testing.T) {
+	socketPath := filepath.Join(t.TempDir(), "supervisor.sock")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- (Server{SocketPath: socketPath, AllowedUID: os.Getuid() + 1}).Serve(ctx)
+	}()
+	waitForSocket(t, socketPath)
+	_, err := (Client{SocketPath: socketPath, Timeout: time.Second}).Call(context.Background(), ActionPing)
+	if err == nil || !strings.Contains(err.Error(), "unauthorized supervisor peer uid") {
+		t.Fatalf("expected unauthorized peer error, got %v", err)
+	}
+	cancel()
+	assertServerStopped(t, errCh)
+}
+
 func TestSupervisorRejectsUnknownAction(t *testing.T) {
 	resp := (Server{}).dispatch(Request{Action: "shell"})
 	if resp.OK || resp.Error == "" {
 		t.Fatalf("expected rejected action, got %#v", resp)
+	}
+}
+
+func waitForSocket(t *testing.T, socketPath string) {
+	t.Helper()
+	for i := 0; i < 50; i++ {
+		info, err := os.Stat(socketPath)
+		if err == nil && info.Mode().Type() == os.ModeSocket {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("supervisor socket %s was not created", socketPath)
+}
+
+func assertServerStopped(t *testing.T, errCh <-chan error) {
+	t.Helper()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("supervisor did not stop")
 	}
 }
 
@@ -193,11 +254,11 @@ func TestSupervisorWGLifecycleDispatchesToManager(t *testing.T) {
 func TestWGProcessManagerStartRunsExpectedSequence(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "wg0.conf")
 	if err := os.WriteFile(configPath, []byte(`[Interface]
-PrivateKey = private-value
+PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 Address = 10.0.15.7/32
 
 [Peer]
-PublicKey = abcdefghijklmnopqrstuvwxyz1234567890
+PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 Endpoint = 172.17.62.1:51820
 AllowedIPs = 0.0.0.0/0
 `), 0o600); err != nil {
@@ -218,11 +279,13 @@ AllowedIPs = 0.0.0.0/0
 		t.Fatalf("unexpected start command: %s %#v", starter.name, starter.args)
 	}
 	want := []string{
-		"wg setconf wg0 " + configPath,
 		"ip addr replace 10.0.15.7/32 dev wg0",
 		"ip link set mtu 1320 up dev wg0",
 	}
-	if strings.Join(runner.calls, "|") != strings.Join(want, "|") {
+	if len(runner.calls) != 3 || !strings.HasPrefix(runner.calls[0], "wg setconf wg0 /tmp/peplink-wg-setconf-") {
+		t.Fatalf("unexpected setconf call: %#v", runner.calls)
+	}
+	if strings.Join(runner.calls[1:], "|") != strings.Join(want, "|") {
 		t.Fatalf("unexpected calls: %#v", runner.calls)
 	}
 	if out == "" {

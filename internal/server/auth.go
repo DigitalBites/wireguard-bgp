@@ -12,15 +12,17 @@ import (
 )
 
 type AuthConfig struct {
-	Token      string
-	SessionTTL time.Duration
+	Token        string
+	SessionTTL   time.Duration
+	CookieSecure bool
 }
 
 type Auth struct {
-	loginToken string
-	sessionTTL time.Duration
-	mu         sync.Mutex
-	sessions   map[string]Session
+	loginToken   string
+	sessionTTL   time.Duration
+	cookieSecure bool
+	mu           sync.Mutex
+	sessions     map[string]Session
 }
 
 type Session struct {
@@ -42,9 +44,10 @@ func NewAuth(cfg AuthConfig) (*Auth, error) {
 		ttl = time.Hour
 	}
 	return &Auth{
-		loginToken: token,
-		sessionTTL: ttl,
-		sessions:   make(map[string]Session),
+		loginToken:   token,
+		sessionTTL:   ttl,
+		cookieSecure: cfg.CookieSecure,
+		sessions:     make(map[string]Session),
 	}, nil
 }
 
@@ -83,16 +86,6 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 }
 
 func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
-	if token := r.URL.Query().Get("token"); token != "" {
-		if s.auth.matchesToken(token) {
-			if err := s.auth.setSession(w); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			http.Redirect(w, r, "/", http.StatusFound)
-			return
-		}
-	}
 	data := map[string]any{
 		"Title": "Login",
 	}
@@ -182,6 +175,7 @@ func (a *Auth) setSession(w http.ResponseWriter) error {
 		Expires:  expires,
 		MaxAge:   int(a.sessionTTL.Seconds()),
 		HttpOnly: true,
+		Secure:   a.cookieSecure,
 		SameSite: http.SameSiteStrictMode,
 	})
 	return nil

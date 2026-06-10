@@ -40,3 +40,28 @@ func TestGenerateRejectsInvalidRoute(t *testing.T) {
 		t.Fatal("expected invalid route error")
 	}
 }
+
+func TestGenerateRejectsUnsafeInterfaceName(t *testing.T) {
+	_, err := Generate(Config{
+		LocalASN:         65060,
+		PeerASN:          65001,
+		PeerIP:           "192.168.50.1",
+		Interface:        "wg0\";\nprotocol static injected",
+		AdvertisedRoutes: []string{"0.0.0.0/1"},
+	})
+	if err == nil {
+		t.Fatal("expected invalid interface error")
+	}
+}
+
+func TestGenerateRejectsIPv6PeerForIPv4Template(t *testing.T) {
+	_, err := Generate(Config{
+		LocalASN:         65060,
+		PeerASN:          65001,
+		PeerIP:           "2001:db8::1",
+		AdvertisedRoutes: []string{"0.0.0.0/1"},
+	})
+	if err == nil {
+		t.Fatal("expected IPv6 peer error")
+	}
+}

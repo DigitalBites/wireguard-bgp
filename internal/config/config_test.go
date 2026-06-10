@@ -56,3 +56,19 @@ func TestValidateManagedPathsRejectsRelativeStateDir(t *testing.T) {
 		t.Fatal("expected relative path validation error")
 	}
 }
+
+func TestValidateManagedPathsRejectsUnsafeInterface(t *testing.T) {
+	cfg := Default()
+	cfg.BIRD.Interface = "wg0\";\ninjected"
+	if err := ValidateManagedPaths(cfg); err == nil {
+		t.Fatal("expected unsafe interface validation error")
+	}
+}
+
+func TestValidateManagedPathsRejectsUnsafeMTU(t *testing.T) {
+	cfg := Default()
+	cfg.WireGuard.MTU = 1
+	if err := ValidateManagedPaths(cfg); err == nil {
+		t.Fatal("expected unsafe MTU validation error")
+	}
+}

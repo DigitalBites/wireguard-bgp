@@ -52,8 +52,8 @@ func NewWithAuth(cfg config.App, templates embed.FS, static embed.FS, authConfig
 	}, nil
 }
 
-func (s *Server) LoginURL() string {
-	return "/login?token=" + s.auth.loginToken
+func (s *Server) LoginToken() string {
+	return s.auth.loginToken
 }
 
 func (s *Server) Handler() http.Handler {

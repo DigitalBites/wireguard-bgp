@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"peplink-wg-bgp/internal/config"
 )
@@ -33,9 +34,10 @@ func TestUnauthenticatedAPIReturnsUnauthorized(t *testing.T) {
 	}
 }
 
-func TestLoginTokenCreatesSession(t *testing.T) {
+func TestLoginTokenPostCreatesSession(t *testing.T) {
 	srv := newTestServer(t, config.Default())
-	req := httptest.NewRequest(http.MethodGet, "/login?token=test-token", nil)
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("token=test-token"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
 	if rec.Code != http.StatusFound {
@@ -46,6 +48,38 @@ func TestLoginTokenCreatesSession(t *testing.T) {
 	}
 	if cookie := findCookie(rec.Result().Cookies(), "peplink_session"); cookie == nil || !cookie.HttpOnly {
 		t.Fatalf("expected httponly session cookie, got %#v", rec.Result().Cookies())
+	}
+}
+
+func TestLoginTokenQueryDoesNotCreateSession(t *testing.T) {
+	srv := newTestServer(t, config.Default())
+	req := httptest.NewRequest(http.MethodGet, "/login?token=test-token", nil)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if cookie := findCookie(rec.Result().Cookies(), "peplink_session"); cookie != nil {
+		t.Fatalf("query login should not set session cookie: %#v", cookie)
+	}
+}
+
+func TestSessionCookieCanBeMarkedSecure(t *testing.T) {
+	srv, err := NewWithAuth(config.Default(), webTemplates(), webStatic(), AuthConfig{
+		Token:        "test-token",
+		SessionTTL:   time.Hour,
+		CookieSecure: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("token=test-token"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	cookie := findCookie(rec.Result().Cookies(), "peplink_session")
+	if cookie == nil || !cookie.Secure {
+		t.Fatalf("expected secure session cookie, got %#v", rec.Result().Cookies())
 	}
 }
 

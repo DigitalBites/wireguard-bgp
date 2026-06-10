@@ -4,8 +4,19 @@ async function refreshStatus() {
   const status = await res.json();
   const wg = document.querySelector('#wg-status');
   const bird = document.querySelector('#bird-status');
-  if (wg) wg.innerHTML = `<dt>Interface</dt><dd>${status.wireGuard.interface}</dd><dt>State</dt><dd>${status.wireGuard.state}</dd>`;
-  if (bird) bird.innerHTML = `<dt>State</dt><dd>${status.bird.state}</dd>`;
+  if (wg) setDefinitionList(wg, [['Interface', status.wireGuard.interface], ['State', status.wireGuard.state]]);
+  if (bird) setDefinitionList(bird, [['State', status.bird.state]]);
+}
+
+function setDefinitionList(el, rows) {
+  el.replaceChildren();
+  rows.forEach(([label, value]) => {
+    const dt = document.createElement('dt');
+    const dd = document.createElement('dd');
+    dt.textContent = label;
+    dd.textContent = value || '';
+    el.append(dt, dd);
+  });
 }
 
 function csrfHeaders(extra = {}) {

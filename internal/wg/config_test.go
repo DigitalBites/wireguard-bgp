@@ -1,15 +1,18 @@
 package wg
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseConfigExtractsMetadataWithoutSecrets(t *testing.T) {
 	input := `[Interface]
-PrivateKey = private-value
+	PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 Address = 10.0.15.7/32
 
 [Peer]
-PublicKey = abcdefghijklmnopqrstuvwxyz1234567890
-PresharedKey = secret
+	PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+	PresharedKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 Endpoint = 172.17.62.1:51820
 AllowedIPs = 0.0.0.0/0, 10.0.0.0/8
 PersistentKeepalive = 25
@@ -27,7 +30,49 @@ PersistentKeepalive = 25
 	if len(meta.AllowedIPs) != 2 || meta.AllowedIPs[1] != "10.0.0.0/8" {
 		t.Fatalf("unexpected allowed IPs: %#v", meta.AllowedIPs)
 	}
-	if got := RedactKey(meta.PeerPublicKey); got != "abcdef...567890" {
+	if got := RedactKey(meta.PeerPublicKey); got != "AAAAAA...AAAAA=" {
 		t.Fatalf("unexpected redaction: %q", got)
+	}
+}
+
+func TestValidateConfigRejectsInvalidAddress(t *testing.T) {
+	_, err := ValidateConfig(`[Interface]
+PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+Address = not-a-prefix
+
+[Peer]
+PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+`)
+	if err == nil {
+		t.Fatal("expected invalid address error")
+	}
+}
+
+func TestValidateConfigRejectsUnsupportedDirective(t *testing.T) {
+	_, err := ValidateConfig(`[Interface]
+PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+PostUp = rm -rf /
+
+[Peer]
+PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+`)
+	if err == nil {
+		t.Fatal("expected unsupported directive error")
+	}
+}
+
+func TestSetconfConfigStripsAddress(t *testing.T) {
+	got := SetconfConfig(`[Interface]
+PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+Address = 10.0.15.7/32
+
+[Peer]
+PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+`)
+	if strings.Contains(got, "Address") {
+		t.Fatalf("setconf config still contains Address:\n%s", got)
+	}
+	if !strings.Contains(got, "PrivateKey") || !strings.Contains(got, "[Peer]") {
+		t.Fatalf("setconf config dropped required values:\n%s", got)
 	}
 }

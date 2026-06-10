@@ -112,10 +112,15 @@ func (m *WGProcessManager) Start(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read WireGuard config: %w", err)
 	}
-	meta := wg.ParseConfig(string(data))
-	if !meta.HasPrivateKey || meta.PeerPublicKey == "" {
-		return "", fmt.Errorf("wireguard config must include interface private key and peer public key")
+	meta, err := wg.ValidateConfig(string(data))
+	if err != nil {
+		return "", err
 	}
+	setconfPath, cleanup, err := writeSetconfFile(string(data))
+	if err != nil {
+		return "", err
+	}
+	defer cleanup()
 
 	starter := m.starter()
 	proc, err := starter.StartProcess("wireguard-go", m.iface())
@@ -125,7 +130,7 @@ func (m *WGProcessManager) Start(ctx context.Context) (string, error) {
 	m.process = proc
 
 	var out bytes.Buffer
-	if err := m.runStep(ctx, &out, "wg", "setconf", m.iface(), cfgPath); err != nil {
+	if err := m.runStep(ctx, &out, "wg", "setconf", m.iface(), setconfPath); err != nil {
 		_ = m.killLocked()
 		return out.String(), err
 	}
@@ -153,6 +158,26 @@ func (m *WGProcessManager) Stop(ctx context.Context) (string, error) {
 		return out.String(), err
 	}
 	return out.String(), nil
+}
+
+func writeSetconfFile(input string) (string, func(), error) {
+	file, err := os.CreateTemp("", "peplink-wg-setconf-*.conf")
+	if err != nil {
+		return "", func() {}, fmt.Errorf("create stripped WireGuard config: %w", err)
+	}
+	cleanup := func() {
+		_ = os.Remove(file.Name())
+	}
+	if _, err := file.WriteString(wg.SetconfConfig(input)); err != nil {
+		_ = file.Close()
+		cleanup()
+		return "", func() {}, fmt.Errorf("write stripped WireGuard config: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		cleanup()
+		return "", func() {}, fmt.Errorf("close stripped WireGuard config: %w", err)
+	}
+	return file.Name(), cleanup, nil
 }
 
 func (m *WGProcessManager) Restart(ctx context.Context) (string, error) {
