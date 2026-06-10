@@ -7,11 +7,13 @@ import (
 	"os"
 	"os/signal"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
 
 	"peplink-wg-bgp/internal/config"
+	"peplink-wg-bgp/internal/orchestrator"
 	"peplink-wg-bgp/internal/server"
 	"peplink-wg-bgp/internal/supervisor"
 	"peplink-wg-bgp/web"
@@ -57,6 +59,7 @@ func runServe() {
 	log.Printf("login token: %s", srv.LoginToken())
 	log.Printf("login sessions expire after 1 hour")
 	log.Printf("listening on %s", cfg.ListenAddr)
+	maybeAutoStart(cfg)
 	httpServer := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           srv.Handler(),
@@ -66,6 +69,37 @@ func runServe() {
 		IdleTimeout:       60 * time.Second,
 	}
 	log.Fatal(httpServer.ListenAndServe())
+}
+
+func maybeAutoStart(cfg config.App) {
+	if !cfg.Runtime.AutoStart {
+		return
+	}
+	if missing, err := missingAutoStartConfig(cfg); err != nil {
+		log.Printf("auto start skipped: required config %s is not available: %v", missing, err)
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		defer cancel()
+		log.Printf("auto start enabled; starting WireGuard, routes, and BIRD")
+		result := (orchestrator.Routing{Client: supervisor.Client{}}).Start(ctx)
+		if !result.OK {
+			log.Printf("auto start failed: %s", orchestrator.ActionSummary(result))
+			return
+		}
+		log.Printf("auto start completed: %s", orchestrator.ActionSummary(result))
+	}()
+}
+
+func missingAutoStartConfig(cfg config.App) (string, error) {
+	wgPath := filepath.Join(cfg.ConfigDir, "wireguard", "wg0.conf")
+	for _, path := range []string{wgPath, cfg.BIRDConfigPath} {
+		if _, err := os.Stat(path); err != nil {
+			return path, err
+		}
+	}
+	return "", nil
 }
 
 func runSupervisor() {

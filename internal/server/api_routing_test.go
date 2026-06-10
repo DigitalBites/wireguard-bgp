@@ -31,8 +31,10 @@ func TestRoutingApplyOrchestratesSupervisorActions(t *testing.T) {
 	}
 	routeManager := &routingRouteManagerTestDouble{output: "routes applied\n"}
 	runner, srv, stop := newSupervisorBackedTestServerWithManagers(t, manager, routeManager)
+	runner.outputs = map[string]string{"wg show": "interface: wg0\n"}
 	defer stop()
 	req := httptest.NewRequest(http.MethodPost, "/api/routing/apply", nil)
+	req.RemoteAddr = "192.0.2.55:49152"
 	addCSRF(t, srv, req)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
@@ -52,7 +54,8 @@ func TestRoutingApplyOrchestratesSupervisorActions(t *testing.T) {
 		t.Fatalf("actions=%#v", gotActions)
 	}
 	wantCommands := []string{
-		"bird -c /app-state/bird/bird.conf -s /run/bird/bird.ctl",
+		"wg show",
+		"birdc -s /run/bird/bird.ctl show status",
 		"birdc -s /run/bird/bird.ctl configure",
 	}
 	if !reflect.DeepEqual(runner.commandLines(), wantCommands) {
@@ -63,6 +66,49 @@ func TestRoutingApplyOrchestratesSupervisorActions(t *testing.T) {
 	}
 	if !routeManager.applied {
 		t.Fatal("expected routes apply")
+	}
+	if routeManager.pinned != "" {
+		t.Fatalf("expected client route pin to be disabled by default, got %q", routeManager.pinned)
+	}
+}
+
+func TestRoutingApplyPinsClientWhenEnabled(t *testing.T) {
+	manager := &routingWGManagerTestDouble{restartOutput: "wg restarted\n"}
+	routeManager := &routingRouteManagerTestDouble{output: "routes applied\n"}
+	_, srv, stop := newSupervisorBackedTestServerWithManagers(t, manager, routeManager)
+	defer stop()
+	srv.cfg.Runtime.PinDashboardClientRoute = true
+	req := httptest.NewRequest(http.MethodPost, "/api/routing/apply", nil)
+	req.RemoteAddr = "192.0.2.55:49152"
+	addCSRF(t, srv, req)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if routeManager.pinned != "192.0.2.55" {
+		t.Fatalf("expected client route pin, got %q", routeManager.pinned)
+	}
+}
+
+func TestRoutingApplyStartsWireGuardWhenStopped(t *testing.T) {
+	manager := &routingWGManagerTestDouble{startOutput: "wg started\n"}
+	routeManager := &routingRouteManagerTestDouble{output: "routes applied\n"}
+	runner, srv, stop := newSupervisorBackedTestServerWithManagers(t, manager, routeManager)
+	runner.outputs = map[string]string{"wg show": ""}
+	defer stop()
+	req := httptest.NewRequest(http.MethodPost, "/api/routing/apply", nil)
+	addCSRF(t, srv, req)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !manager.started || manager.restarted {
+		t.Fatalf("expected start without restart: %#v", manager)
+	}
+	if strings.Contains(rec.Body.String(), "wireguard interface already absent") {
+		t.Fatalf("unexpected restart output: %s", rec.Body.String())
 	}
 }
 
@@ -115,11 +161,17 @@ type routingWGManagerTestDouble struct {
 type routingRouteManagerTestDouble struct {
 	output  string
 	applied bool
+	pinned  string
 }
 
 func (m *routingRouteManagerTestDouble) Apply(ctx context.Context) (string, error) {
 	m.applied = true
 	return m.output, nil
+}
+
+func (m *routingRouteManagerTestDouble) PinClient(ctx context.Context, clientIP string) (string, error) {
+	m.pinned = clientIP
+	return "client pinned\n", nil
 }
 
 func (m *routingWGManagerTestDouble) Start(ctx context.Context) (string, error) {

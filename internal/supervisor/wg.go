@@ -54,18 +54,28 @@ func (s Server) statusWG() Response {
 	return s.runCommand(ActionWGStatus, "wg", "show")
 }
 
+func (s Server) dumpWG() Response {
+	return s.runCommand(ActionWGDump, "wg", "show", DefaultWGInterface, "dump")
+}
+
 func (s Server) startWG() Response {
-	out, err := s.wgManager().Start(context.Background())
+	ctx, cancel := s.commandContext()
+	defer cancel()
+	out, err := s.wgManager().Start(ctx)
 	return wgResponse(ActionWGStart, out, err)
 }
 
 func (s Server) stopWG() Response {
-	out, err := s.wgManager().Stop(context.Background())
+	ctx, cancel := s.commandContext()
+	defer cancel()
+	out, err := s.wgManager().Stop(ctx)
 	return wgResponse(ActionWGStop, out, err)
 }
 
 func (s Server) restartWG() Response {
-	out, err := s.wgManager().Restart(context.Background())
+	ctx, cancel := s.commandContext()
+	defer cancel()
+	out, err := s.wgManager().Restart(ctx)
 	return wgResponse(ActionWGRestart, out, err)
 }
 
@@ -104,9 +114,6 @@ func (p *execProcess) Wait() error {
 func (m *WGProcessManager) Start(ctx context.Context) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.process != nil {
-		return "wireguard-go already running\n", nil
-	}
 	cfgPath := m.configPath()
 	data, err := os.ReadFile(cfgPath)
 	if err != nil {
@@ -122,14 +129,10 @@ func (m *WGProcessManager) Start(ctx context.Context) (string, error) {
 	}
 	defer cleanup()
 
-	starter := m.starter()
-	proc, err := starter.StartProcess("wireguard-go", m.iface())
-	if err != nil {
-		return "", fmt.Errorf("start wireguard-go: %w", err)
-	}
-	m.process = proc
-
 	var out bytes.Buffer
+	if err := m.ensureInterface(ctx, &out); err != nil {
+		return out.String(), err
+	}
 	if err := m.runStep(ctx, &out, "wg", "setconf", m.iface(), setconfPath); err != nil {
 		_ = m.killLocked()
 		return out.String(), err
@@ -140,7 +143,7 @@ func (m *WGProcessManager) Start(ctx context.Context) (string, error) {
 			return out.String(), err
 		}
 	}
-	if err := m.runStep(ctx, &out, "ip", "link", "set", "mtu", fmt.Sprint(m.mtu()), "up", "dev", m.iface()); err != nil {
+	if err := m.runStep(ctx, &out, "ip", "link", "set", "mtu", fmt.Sprint(m.effectiveMTU(meta)), "up", "dev", m.iface()); err != nil {
 		_ = m.killLocked()
 		return out.String(), err
 	}
@@ -151,13 +154,56 @@ func (m *WGProcessManager) Stop(ctx context.Context) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var out bytes.Buffer
-	if err := m.runStep(ctx, &out, "ip", "link", "delete", "dev", m.iface()); err != nil {
-		return out.String(), err
+	deleteOut, deleteErr := m.runner().Run(ctx, "ip", "link", "delete", "dev", m.iface())
+	if deleteOut != "" && !isMissingInterfaceOutput(deleteOut) {
+		appendOutput(&out, deleteOut)
 	}
-	if err := m.killLocked(); err != nil {
-		return out.String(), err
+	killErr := m.killLocked()
+	if killErr != nil {
+		return out.String(), killErr
+	}
+	if deleteErr != nil && !isMissingInterfaceOutput(deleteOut) {
+		return out.String(), deleteErr
+	}
+	if deleteErr != nil {
+		out.WriteString("wireguard interface already absent\n")
 	}
 	return out.String(), nil
+}
+
+func (m *WGProcessManager) ensureInterface(ctx context.Context, out *bytes.Buffer) error {
+	showOut, showErr := m.runner().Run(ctx, "ip", "link", "show", "dev", m.iface())
+	if showErr == nil {
+		appendOutput(out, showOut)
+		out.WriteString("wireguard interface already exists\n")
+		return nil
+	}
+	if showOut != "" && !isMissingInterfaceOutput(showOut) {
+		appendOutput(out, showOut)
+	}
+	addOut, addErr := m.runner().Run(ctx, "ip", "link", "add", "dev", m.iface(), "type", "wireguard")
+	if addErr == nil {
+		appendOutput(out, addOut)
+		return nil
+	}
+	appendOutput(out, addOut)
+	if m.process != nil {
+		return nil
+	}
+	starter := m.starter()
+	proc, err := starter.StartProcess("wireguard-go", m.iface())
+	if err != nil {
+		return fmt.Errorf("create WireGuard interface with kernel or wireguard-go: %w", err)
+	}
+	m.process = proc
+	return nil
+}
+
+func isMissingInterfaceOutput(output string) bool {
+	lower := strings.ToLower(output)
+	return strings.Contains(lower, "cannot find device") ||
+		strings.Contains(lower, "does not exist") ||
+		strings.Contains(lower, "no such device")
 }
 
 func writeSetconfFile(input string) (string, func(), error) {
@@ -202,16 +248,21 @@ func wgResponse(action string, out string, err error) Response {
 
 func (m *WGProcessManager) runStep(ctx context.Context, out *bytes.Buffer, name string, args ...string) error {
 	stepOut, err := m.runner().Run(ctx, name, args...)
-	if stepOut != "" {
-		out.WriteString(stepOut)
-		if !strings.HasSuffix(stepOut, "\n") {
-			out.WriteByte('\n')
-		}
-	}
+	appendOutput(out, stepOut)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func appendOutput(out *bytes.Buffer, text string) {
+	if text == "" {
+		return
+	}
+	out.WriteString(text)
+	if !strings.HasSuffix(text, "\n") {
+		out.WriteByte('\n')
+	}
 }
 
 func (m *WGProcessManager) killLocked() error {
@@ -242,6 +293,13 @@ func (m *WGProcessManager) mtu() int {
 		return DefaultWGMTU
 	}
 	return m.MTU
+}
+
+func (m *WGProcessManager) effectiveMTU(meta wg.ConfigMeta) int {
+	if meta.InterfaceMTU != 0 {
+		return meta.InterfaceMTU
+	}
+	return m.mtu()
 }
 
 func (m *WGProcessManager) runner() CommandRunner {

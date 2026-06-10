@@ -19,13 +19,37 @@ func (c *recordingClient) Call(ctx context.Context, action string) (supervisor.R
 	if action == c.fail {
 		return supervisor.Response{OK: false, Action: action, Error: "failed"}, errors.New("failed")
 	}
+	if action == supervisor.ActionWGStatus {
+		return supervisor.Response{OK: true, Action: action, Output: "interface: wg0\n"}, nil
+	}
 	return supervisor.Response{OK: true, Action: action, Output: action + "\n"}, nil
 }
 
-func TestRoutingApplyOrder(t *testing.T) {
+type downStatusClient struct {
+	recordingClient
+}
+
+func (c *downStatusClient) Call(ctx context.Context, action string) (supervisor.Response, error) {
+	c.calls = append(c.calls, action)
+	if action == supervisor.ActionWGStatus {
+		return supervisor.Response{OK: true, Action: action, Output: ""}, nil
+	}
+	return supervisor.Response{OK: true, Action: action, Output: action + "\n"}, nil
+}
+
+func TestRoutingApplyRestartsWhenWireGuardIsUp(t *testing.T) {
 	client := &recordingClient{}
 	result := (Routing{Client: client}).Apply(context.Background())
-	want := []string{supervisor.ActionWGRestart, supervisor.ActionRoutesApply, supervisor.ActionBIRDStart, supervisor.ActionBIRDReload}
+	want := []string{supervisor.ActionWGStatus, supervisor.ActionWGRestart, supervisor.ActionRoutesApply, supervisor.ActionBIRDStart, supervisor.ActionBIRDReload}
+	if !result.OK || !reflect.DeepEqual(client.calls, want) {
+		t.Fatalf("calls=%#v result=%#v", client.calls, result)
+	}
+}
+
+func TestRoutingApplyStartsWhenWireGuardIsDown(t *testing.T) {
+	client := &downStatusClient{}
+	result := (Routing{Client: client}).Apply(context.Background())
+	want := []string{supervisor.ActionWGStatus, supervisor.ActionWGStart, supervisor.ActionRoutesApply, supervisor.ActionBIRDStart, supervisor.ActionBIRDReload}
 	if !result.OK || !reflect.DeepEqual(client.calls, want) {
 		t.Fatalf("calls=%#v result=%#v", client.calls, result)
 	}

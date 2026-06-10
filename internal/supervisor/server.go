@@ -8,11 +8,13 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 )
 
 func (s Server) Serve(ctx context.Context) error {
+	s = s.withRuntimeDefaults()
 	socketPath := s.SocketPath
 	if socketPath == "" {
 		socketPath = DefaultSocketPath
@@ -59,14 +61,42 @@ func (s Server) handle(conn net.Conn) {
 		_ = json.NewEncoder(conn).Encode(Response{OK: false, Error: err.Error()})
 		return
 	}
-	_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(60 * time.Second))
 	var req Request
 	if err := json.NewDecoder(io.LimitReader(conn, 4096)).Decode(&req); err != nil {
 		_ = json.NewEncoder(conn).Encode(Response{OK: false, Error: "invalid request: " + err.Error()})
 		return
 	}
+	if s.ActionLock != nil {
+		s.ActionLock.Lock()
+		defer s.ActionLock.Unlock()
+	}
 	resp := s.dispatch(req)
 	_ = json.NewEncoder(conn).Encode(resp)
+}
+
+func (s Server) withRuntimeDefaults() Server {
+	if s.WGManager == nil {
+		s.WGManager = &WGProcessManager{Runner: s.Runner}
+	}
+	if s.RouteManager == nil {
+		s.RouteManager = &RouteApplyManager{
+			AppConfigPath: s.appConfigPath(),
+			WGConfigPath:  DefaultWGConfigPath,
+			Runner:        s.Runner,
+		}
+	}
+	if s.BIRDManager == nil {
+		s.BIRDManager = &BIRDProcessManager{
+			ConfigPath: s.birdConfigPath(),
+			SocketPath: s.birdSocketPath(),
+			Runner:     s.Runner,
+		}
+	}
+	if s.ActionLock == nil {
+		s.ActionLock = &sync.Mutex{}
+	}
+	return s
 }
 
 func (s Server) authorize(conn net.Conn) error {

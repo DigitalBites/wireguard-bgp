@@ -1,11 +1,73 @@
+let statusStreamConnected = false;
+let statusLastRefreshedAt = 0;
+
 async function refreshStatus() {
-  const res = await fetch('/api/status');
-  if (!res.ok) return;
-  const status = await res.json();
-  const wg = document.querySelector('#wg-status');
-  const bird = document.querySelector('#bird-status');
-  if (wg) setDefinitionList(wg, [['Interface', status.wireGuard.interface], ['State', status.wireGuard.state]]);
-  if (bird) setDefinitionList(bird, [['State', status.bird.state]]);
+  try {
+    const res = await fetch('/api/status');
+    if (!res.ok) {
+      setRefreshConnected(false);
+      return;
+    }
+    const status = await res.json();
+    const wg = document.querySelector('#wg-status');
+    const bird = document.querySelector('#bird-status');
+    if (wg) setDefinitionList(wg, statusRows('WireGuard', status.wireGuard));
+    if (bird) setDefinitionList(bird, statusRows('BIRD', status.bird));
+    statusLastRefreshedAt = Date.now();
+    updateRefreshAges();
+    setRefreshConnected(statusStreamConnected || !window.EventSource);
+  } catch (_err) {
+    setRefreshConnected(false);
+  }
+}
+
+function setRefreshConnected(connected) {
+  document.querySelectorAll('[data-refresh-indicator]').forEach((indicator) => {
+    indicator.classList.toggle('is-connected', connected);
+    indicator.classList.toggle('is-disconnected', !connected);
+    indicator.title = connected ? 'Status stream connected' : 'Status stream disconnected';
+    const label = indicator.querySelector('.sr-only');
+    if (label) label.textContent = connected ? 'Connected' : 'Disconnected';
+  });
+}
+
+function updateRefreshAges() {
+  const text = statusLastRefreshedAt ? `Last refreshed: ${formatAge(Date.now() - statusLastRefreshedAt)} ago` : 'Last refreshed: never';
+  document.querySelectorAll('[data-refresh-age]').forEach((el) => {
+    el.textContent = text;
+  });
+}
+
+function formatAge(ms) {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  if (seconds < 60) return `${seconds} seconds`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minutes`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} hours`;
+}
+
+function statusRows(kind, service) {
+  const stats = service.stats || {};
+  if (kind === 'WireGuard') {
+    return [
+      ['Interface', service.interface],
+      ['State', service.state],
+      ['Endpoint', stats.endpoint],
+      ['Latest handshake', stats.latestHandshake],
+      ['RX bytes', stats.rxBytes],
+      ['TX bytes', stats.txBytes],
+      ['Keepalive', stats.persistentKeepalive],
+    ].filter(([, value]) => value);
+  }
+  return [
+    ['State', service.state],
+    ['BGP state', stats.bgpState],
+    ['Neighbor', stats.neighbor],
+    ['Neighbor AS', stats.neighborAS],
+    ['Local AS', stats.localAS],
+    ['Routes', stats.routes],
+  ].filter(([, value]) => value);
 }
 
 function setDefinitionList(el, rows) {
@@ -122,6 +184,46 @@ async function loadWireGuardConfig() {
   if (message) message.textContent = body.exists ? 'Loaded with keys redacted' : 'No WireGuard config saved';
 }
 
+async function loadSettings() {
+  const form = document.querySelector('#settings-form');
+  const message = document.querySelector('#settings-message');
+  if (!form) return;
+  const res = await fetch('/api/settings');
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (message) message.textContent = body.error || 'Load failed';
+    return;
+  }
+  form.autoStart.checked = Boolean(body.autoStart);
+  form.pinDashboardClientRoute.checked = Boolean(body.pinDashboardClientRoute);
+  form.pinnedClientRoutes.value = (body.pinnedClientRoutes || []).join('\n');
+}
+
+async function saveSettings(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const message = document.querySelector('#settings-message');
+  const payload = {
+    autoStart: form.autoStart.checked,
+    pinDashboardClientRoute: form.pinDashboardClientRoute.checked,
+    pinnedClientRoutes: form.pinnedClientRoutes.value.split('\n').map((route) => route.trim()).filter(Boolean),
+  };
+  const res = await fetch('/api/settings', {
+    method: 'POST',
+    headers: csrfHeaders({'Content-Type': 'application/json'}),
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    message.textContent = body.error || 'Save failed';
+    return;
+  }
+  form.autoStart.checked = Boolean(body.autoStart);
+  form.pinDashboardClientRoute.checked = Boolean(body.pinDashboardClientRoute);
+  form.pinnedClientRoutes.value = (body.pinnedClientRoutes || []).join('\n');
+  message.textContent = 'Saved';
+}
+
 async function saveBirdConfig(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -201,7 +303,11 @@ document.querySelectorAll('[data-diag]').forEach(refreshDiag);
 refreshStatus();
 loadWireGuardConfig();
 loadBirdConfig();
+loadSettings();
 loadLogs();
+
+const settingsForm = document.querySelector('#settings-form');
+if (settingsForm) settingsForm.addEventListener('submit', saveSettings);
 
 const birdForm = document.querySelector('#bird-form');
 if (birdForm) birdForm.addEventListener('submit', saveBirdConfig);
@@ -218,5 +324,16 @@ document.querySelectorAll('[data-routing-action]').forEach((button) => {
 
 if (window.EventSource) {
   const events = new EventSource('/api/events');
+  events.addEventListener('open', () => {
+    statusStreamConnected = true;
+    setRefreshConnected(true);
+  });
   events.addEventListener('status', refreshStatus);
+  events.addEventListener('error', () => {
+    statusStreamConnected = false;
+    setRefreshConnected(false);
+  });
 }
+
+setInterval(updateRefreshAges, 1000);
+updateRefreshAges();

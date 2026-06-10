@@ -9,6 +9,7 @@ func TestParseConfigExtractsMetadataWithoutSecrets(t *testing.T) {
 	input := `[Interface]
 	PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 Address = 10.0.15.7/32
+MTU = 1280
 
 [Peer]
 	PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
@@ -23,6 +24,9 @@ PersistentKeepalive = 25
 	}
 	if meta.InterfaceAddress != "10.0.15.7/32" {
 		t.Fatalf("unexpected address: %q", meta.InterfaceAddress)
+	}
+	if meta.InterfaceMTU != 1280 {
+		t.Fatalf("unexpected MTU: %d", meta.InterfaceMTU)
 	}
 	if meta.Endpoint != "172.17.62.1:51820" {
 		t.Fatalf("unexpected endpoint: %q", meta.Endpoint)
@@ -48,6 +52,33 @@ PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 	}
 }
 
+func TestValidateConfigRejectsInvalidMTU(t *testing.T) {
+	_, err := ValidateConfig(`[Interface]
+PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+MTU = 1
+
+[Peer]
+PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+`)
+	if err == nil {
+		t.Fatal("expected invalid MTU error")
+	}
+}
+
+func TestValidateConfigAllowsHostnameEndpoint(t *testing.T) {
+	_, err := ValidateConfig(`[Interface]
+PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+Address = 10.0.15.7/32
+
+[Peer]
+PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+Endpoint = vpn.example.test:51820
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestValidateConfigRejectsUnsupportedDirective(t *testing.T) {
 	_, err := ValidateConfig(`[Interface]
 PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
@@ -65,12 +96,16 @@ func TestSetconfConfigStripsAddress(t *testing.T) {
 	got := SetconfConfig(`[Interface]
 PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 Address = 10.0.15.7/32
+MTU = 1280
 
 [Peer]
 PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 `)
 	if strings.Contains(got, "Address") {
 		t.Fatalf("setconf config still contains Address:\n%s", got)
+	}
+	if strings.Contains(got, "MTU") {
+		t.Fatalf("setconf config still contains MTU:\n%s", got)
 	}
 	if !strings.Contains(got, "PrivateKey") || !strings.Contains(got, "[Peer]") {
 		t.Fatalf("setconf config dropped required values:\n%s", got)

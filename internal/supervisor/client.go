@@ -10,13 +10,17 @@ import (
 )
 
 func (c Client) Call(ctx context.Context, action string) (Response, error) {
+	return c.CallWithParams(ctx, action, nil)
+}
+
+func (c Client) CallWithParams(ctx context.Context, action string, params map[string]string) (Response, error) {
 	socketPath := c.SocketPath
 	if socketPath == "" {
 		socketPath = DefaultSocketPath
 	}
 	timeout := c.Timeout
 	if timeout == 0 {
-		timeout = 3 * time.Second
+		timeout = 30 * time.Second
 	}
 	dialer := net.Dialer{Timeout: timeout}
 	conn, err := dialer.DialContext(ctx, "unix", socketPath)
@@ -27,7 +31,7 @@ func (c Client) Call(ctx context.Context, action string) (Response, error) {
 		_ = conn.Close()
 	}()
 	_ = conn.SetDeadline(time.Now().Add(timeout))
-	if err := json.NewEncoder(conn).Encode(Request{Action: action}); err != nil {
+	if err := json.NewEncoder(conn).Encode(Request{Action: action, Params: params}); err != nil {
 		return Response{}, err
 	}
 	var resp Response

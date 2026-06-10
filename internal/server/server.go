@@ -70,6 +70,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/status", s.status)
 	mux.HandleFunc("GET /api/events", s.events)
 	mux.HandleFunc("GET /api/logs", s.getLogs)
+	mux.HandleFunc("GET /api/settings", s.getSettings)
+	mux.HandleFunc("POST /api/settings", s.postSettings)
 	mux.HandleFunc("GET /api/supervisor/status", s.supervisorStatus)
 	mux.HandleFunc("GET /api/wg/config", s.getWGConfig)
 	mux.HandleFunc("POST /api/wg/config", s.postWGConfig)

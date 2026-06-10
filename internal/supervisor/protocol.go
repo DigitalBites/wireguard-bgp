@@ -1,6 +1,9 @@
 package supervisor
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 const (
 	DefaultSocketPath     = "/run/peplink-wg-bgp/supervisor.sock"
@@ -12,15 +15,19 @@ const (
 	ActionBIRDStop        = "bird.stop"
 	ActionBIRDReload      = "bird.reload"
 	ActionBIRDStatus      = "bird.status"
+	ActionBIRDDetails     = "bird.details"
 	ActionWGStart         = "wg.start"
 	ActionWGStop          = "wg.stop"
 	ActionWGRestart       = "wg.restart"
 	ActionWGStatus        = "wg.status"
+	ActionWGDump          = "wg.dump"
 	ActionRoutesApply     = "routes.apply"
+	ActionRoutesPinClient = "routes.pin_client"
 )
 
 type Request struct {
-	Action string `json:"action"`
+	Action string            `json:"action"`
+	Params map[string]string `json:"params,omitempty"`
 }
 
 type Response struct {
@@ -37,6 +44,8 @@ type Server struct {
 	Runner         CommandRunner
 	WGManager      WGManager
 	RouteManager   RouteManager
+	BIRDManager    BIRDManager
+	ActionLock     *sync.Mutex
 	AppConfigPath  string
 	BIRDConfigPath string
 	BIRDSocketPath string

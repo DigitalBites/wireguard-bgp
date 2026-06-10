@@ -29,8 +29,17 @@ type Result struct {
 }
 
 func (r Routing) Apply(ctx context.Context) Result {
+	status, err := r.Client.Call(ctx, supervisor.ActionWGStatus)
+	if err == nil && status.OK && wireGuardStatusUp(status.Output) {
+		return r.run(ctx, []string{
+			supervisor.ActionWGRestart,
+			supervisor.ActionRoutesApply,
+			supervisor.ActionBIRDStart,
+			supervisor.ActionBIRDReload,
+		})
+	}
 	return r.run(ctx, []string{
-		supervisor.ActionWGRestart,
+		supervisor.ActionWGStart,
 		supervisor.ActionRoutesApply,
 		supervisor.ActionBIRDStart,
 		supervisor.ActionBIRDReload,
@@ -96,4 +105,8 @@ func ActionSummary(result Result) string {
 		parts = append(parts, fmt.Sprintf("%s:error", step.Action))
 	}
 	return strings.Join(parts, ",")
+}
+
+func wireGuardStatusUp(output string) bool {
+	return strings.Contains(output, "interface:")
 }

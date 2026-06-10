@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,8 +17,15 @@ type App struct {
 	ListenAddr     string      `json:"listenAddr" yaml:"listenAddr"`
 	ConfigDir      string      `json:"configDir" yaml:"configDir"`
 	BIRDConfigPath string      `json:"birdConfigPath" yaml:"birdConfigPath"`
+	Runtime        Runtime     `json:"runtime" yaml:"runtime"`
 	WireGuard      WireGuard   `json:"wireGuard" yaml:"wireGuard"`
 	BIRD           bird.Config `json:"bird" yaml:"bird"`
+}
+
+type Runtime struct {
+	AutoStart               bool     `json:"autoStart" yaml:"autoStart"`
+	PinDashboardClientRoute bool     `json:"pinDashboardClientRoute" yaml:"pinDashboardClientRoute"`
+	PinnedClientRoutes      []string `json:"pinnedClientRoutes,omitempty" yaml:"pinnedClientRoutes,omitempty"`
 }
 
 type WireGuard struct {
@@ -103,10 +111,63 @@ func ValidateManagedPaths(cfg App) error {
 	if cfg.WireGuard.MTU < 576 || cfg.WireGuard.MTU > 9000 {
 		return fmt.Errorf("wireguard MTU must be 576-9000")
 	}
+	if err := ValidateRuntime(cfg.Runtime); err != nil {
+		return err
+	}
 	if err := bird.ValidateInterfaceName(cfg.BIRD.WithDefaults().Interface); err != nil {
 		return fmt.Errorf("BIRD interface is invalid: %w", err)
 	}
 	return nil
+}
+
+func ValidateRuntime(runtime Runtime) error {
+	for _, route := range runtime.PinnedClientRoutes {
+		if _, err := NormalizePinnedClientRoute(route); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NormalizePinnedClientRoutes(routes []string) ([]string, error) {
+	normalized := make([]string, 0, len(routes))
+	seen := map[string]struct{}{}
+	for _, route := range routes {
+		prefix, err := NormalizePinnedClientRoute(route)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := seen[prefix]; ok {
+			continue
+		}
+		seen[prefix] = struct{}{}
+		normalized = append(normalized, prefix)
+	}
+	return normalized, nil
+}
+
+func NormalizePinnedClientRoute(route string) (string, error) {
+	route = strings.TrimSpace(route)
+	if route == "" {
+		return "", fmt.Errorf("pinned client route must not be empty")
+	}
+	if addr, err := netip.ParseAddr(route); err == nil {
+		if !addr.Is4() {
+			return "", fmt.Errorf("pinned client route %q must be IPv4", route)
+		}
+		return addr.String() + "/32", nil
+	}
+	prefix, err := netip.ParsePrefix(route)
+	if err != nil {
+		return "", fmt.Errorf("pinned client route %q is invalid: %w", route, err)
+	}
+	if !prefix.Addr().Is4() {
+		return "", fmt.Errorf("pinned client route %q must be IPv4", route)
+	}
+	if prefix.Bits() != 32 {
+		return "", fmt.Errorf("pinned client route %q must be a /32 host route", route)
+	}
+	return prefix.Masked().String(), nil
 }
 
 func Save(path string, cfg App) error {

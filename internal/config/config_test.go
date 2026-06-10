@@ -13,6 +13,9 @@ func TestLoadMissingReturnsDefaults(t *testing.T) {
 	if cfg.ListenAddr != ":8080" || cfg.ConfigDir != "/app-state" || cfg.BIRDConfigPath != "/app-state/bird/bird.conf" || cfg.WireGuard.Interface != "wg0" || cfg.WireGuard.MTU != 1320 {
 		t.Fatalf("unexpected defaults: %#v", cfg)
 	}
+	if cfg.Runtime.AutoStart || cfg.Runtime.PinDashboardClientRoute {
+		t.Fatalf("runtime options should default off: %#v", cfg.Runtime)
+	}
 }
 
 func TestSaveAndLoadRoundTrip(t *testing.T) {
@@ -28,7 +31,7 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.BIRD.LocalASN != 65060 || got.BIRD.PeerIP != "192.168.50.1" {
+	if got.BIRD.LocalASN != 65060 || got.BIRD.PeerIP != "192.168.50.1" || got.Runtime.AutoStart {
 		t.Fatalf("unexpected loaded config: %#v", got)
 	}
 }
@@ -70,5 +73,22 @@ func TestValidateManagedPathsRejectsUnsafeMTU(t *testing.T) {
 	cfg.WireGuard.MTU = 1
 	if err := ValidateManagedPaths(cfg); err == nil {
 		t.Fatal("expected unsafe MTU validation error")
+	}
+}
+
+func TestNormalizePinnedClientRoutes(t *testing.T) {
+	got, err := NormalizePinnedClientRoutes([]string{"192.168.64.1", "192.168.64.1/32"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != "192.168.64.1/32" {
+		t.Fatalf("unexpected routes: %#v", got)
+	}
+}
+
+func TestValidateRuntimeRejectsBroadPinnedClientRoute(t *testing.T) {
+	err := ValidateRuntime(Runtime{PinnedClientRoutes: []string{"192.168.64.0/24"}})
+	if err == nil {
+		t.Fatal("expected broad pinned route error")
 	}
 }

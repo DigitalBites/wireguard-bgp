@@ -138,8 +138,11 @@ func TestBirdStartCallsSupervisor(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
-	if runner.commandLine() != "bird -c /app-state/bird/bird.conf -s /run/bird/bird.ctl" {
+	if runner.commandLine() != "birdc -s /run/bird/bird.ctl show status" {
 		t.Fatalf("unexpected command: %s", runner.commandLine())
+	}
+	if !strings.Contains(rec.Body.String(), "bird already running") {
+		t.Fatalf("unexpected response: %s", rec.Body.String())
 	}
 }
 

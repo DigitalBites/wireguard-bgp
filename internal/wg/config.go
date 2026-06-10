@@ -12,6 +12,7 @@ import (
 
 type ConfigMeta struct {
 	InterfaceAddress    string   `json:"interfaceAddress,omitempty"`
+	InterfaceMTU        int      `json:"interfaceMtu,omitempty"`
 	Endpoint            string   `json:"endpoint,omitempty"`
 	AllowedIPs          []string `json:"allowedIPs,omitempty"`
 	PeerPublicKey       string   `json:"peerPublicKey,omitempty"`
@@ -46,6 +47,8 @@ func ParseConfig(input string) ConfigMeta {
 			meta.HasPrivateKey = value != ""
 		case "interface.address":
 			meta.InterfaceAddress = value
+		case "interface.mtu":
+			meta.InterfaceMTU, _ = strconv.Atoi(value)
 		case "peer.publickey":
 			meta.PeerPublicKey = value
 		case "peer.presharedkey":
@@ -212,7 +215,7 @@ func SetconfConfig(input string) string {
 			continue
 		}
 		key, _, ok := strings.Cut(line, "=")
-		if ok && section == "interface" && strings.EqualFold(strings.TrimSpace(key), "Address") {
+		if ok && section == "interface" && isInterfaceMetadataDirective(strings.TrimSpace(key)) {
 			continue
 		}
 		out = append(out, raw)
@@ -230,6 +233,11 @@ func validateDirective(section, key, value string) error {
 		}
 		if _, err := netip.ParsePrefix(value); err != nil {
 			return fmt.Errorf("WireGuard interface address is invalid: %w", err)
+		}
+	case "interface.mtu":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 576 || n > 9000 {
+			return fmt.Errorf("WireGuard interface MTU must be 576-9000")
 		}
 	case "interface.listenport":
 		return validatePort("WireGuard listen port", value)
@@ -257,6 +265,10 @@ func validateDirective(section, key, value string) error {
 		return fmt.Errorf("unsupported WireGuard directive %s.%s", section, key)
 	}
 	return nil
+}
+
+func isInterfaceMetadataDirective(key string) bool {
+	return strings.EqualFold(key, "Address") || strings.EqualFold(key, "MTU")
 }
 
 func validateKey(label, value string) error {

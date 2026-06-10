@@ -15,6 +15,15 @@
   </header>
   <main class="stack">
     <section class="panel">
+      <h2>Runtime</h2>
+      <form id="settings-form">
+        <label class="check-row"><input name="autoStart" type="checkbox"> Auto start services on container startup</label>
+        <label class="check-row"><input name="pinDashboardClientRoute" type="checkbox"> Pin this dashboard client's route outside the tunnel during Start, Apply, and Restart</label>
+        <label>Testing bypass routes<textarea name="pinnedClientRoutes" class="short-textarea" placeholder="192.168.64.1&#10;192.168.64.50/32"></textarea></label>
+        <div class="actions"><button type="submit">Save Runtime</button><span id="settings-message"></span></div>
+      </form>
+    </section>
+    <section class="panel">
       <h2>WireGuard</h2>
       <textarea id="wg-config" placeholder="Paste wg0.conf"></textarea>
       <div class="actions"><button id="save-wg" type="button">Save WireGuard</button><span id="wg-message"></span></div>
