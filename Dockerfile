@@ -12,7 +12,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/peplink-wg-bgp ./cmd/peplink-wg-bgp
 
-FROM alpine:3.22
+FROM alpine:3.24
 
 RUN apk add --no-cache \
     bird \
