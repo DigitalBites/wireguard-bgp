@@ -10,6 +10,9 @@ const (
 	ActionBIRDStart       = "bird.start"
 	ActionBIRDReload      = "bird.reload"
 	ActionBIRDStatus      = "bird.status"
+	ActionWGStart         = "wg.start"
+	ActionWGStop          = "wg.stop"
+	ActionWGRestart       = "wg.restart"
 	ActionWGStatus        = "wg.status"
 )
 
@@ -29,6 +32,7 @@ type Server struct {
 	AllowedUID     int
 	CommandTimeout time.Duration
 	Runner         CommandRunner
+	WGManager      WGManager
 	BIRDConfigPath string
 	BIRDSocketPath string
 }

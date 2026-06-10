@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -84,6 +85,72 @@ func TestWGStatusCallsSupervisor(t *testing.T) {
 	}
 	cancel()
 	assertSupervisorStopped(t, errCh)
+}
+
+func TestWGStartRequiresCSRF(t *testing.T) {
+	srv := newTestServer(t, config.Default())
+	req := httptest.NewRequest(http.MethodPost, "/api/wg/start", nil)
+	addTestSession(t, srv, req)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestWGLifecycleCallsSupervisor(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		action   string
+		expected string
+	}{
+		{name: "start", path: "/api/wg/start", action: "wg.start", expected: "started"},
+		{name: "stop", path: "/api/wg/stop", action: "wg.stop", expected: "stopped"},
+		{name: "restart", path: "/api/wg/restart", action: "wg.restart", expected: "restarted"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := &serverWGManagerTestDouble{
+				startOutput:   "started\n",
+				stopOutput:    "stopped\n",
+				restartOutput: "restarted\n",
+			}
+			runner, srv, stop := newSupervisorBackedTestServerWithWG(t, manager)
+			defer stop()
+			req := httptest.NewRequest(http.MethodPost, tt.path, nil)
+			addCSRF(t, srv, req)
+			rec := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+			}
+			if runner.commandLine() != "" {
+				t.Fatalf("wg lifecycle should use manager, got command %s", runner.commandLine())
+			}
+			if !strings.Contains(rec.Body.String(), `"action":"`+tt.action+`"`) || !strings.Contains(rec.Body.String(), tt.expected) {
+				t.Fatalf("unexpected response: %s", rec.Body.String())
+			}
+		})
+	}
+}
+
+type serverWGManagerTestDouble struct {
+	startOutput   string
+	stopOutput    string
+	restartOutput string
+}
+
+func (m *serverWGManagerTestDouble) Start(ctx context.Context) (string, error) {
+	return m.startOutput, nil
+}
+
+func (m *serverWGManagerTestDouble) Stop(ctx context.Context) (string, error) {
+	return m.stopOutput, nil
+}
+
+func (m *serverWGManagerTestDouble) Restart(ctx context.Context) (string, error) {
+	return m.restartOutput, nil
 }
 
 func validWGConfig() string {

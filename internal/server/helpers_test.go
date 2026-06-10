@@ -61,6 +61,11 @@ func addCSRF(t *testing.T, srv *Server, req *http.Request) {
 
 func newSupervisorBackedTestServer(t *testing.T) (*serverSupervisorTestRunner, *Server, func()) {
 	t.Helper()
+	return newSupervisorBackedTestServerWithWG(t, nil)
+}
+
+func newSupervisorBackedTestServerWithWG(t *testing.T, manager supervisor.WGManager) (*serverSupervisorTestRunner, *Server, func()) {
+	t.Helper()
 	socketPath := filepath.Join(t.TempDir(), "supervisor.sock")
 	ctx, cancel := context.WithCancel(context.Background())
 	runner := &serverSupervisorTestRunner{}
@@ -69,6 +74,7 @@ func newSupervisorBackedTestServer(t *testing.T) (*serverSupervisorTestRunner, *
 		errCh <- (supervisor.Server{
 			SocketPath: socketPath,
 			Runner:     runner,
+			WGManager:  manager,
 		}).Serve(ctx)
 	}()
 	waitForSupervisor(t, socketPath)

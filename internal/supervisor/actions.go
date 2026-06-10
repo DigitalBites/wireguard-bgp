@@ -12,6 +12,12 @@ func (s Server) dispatch(req Request) Response {
 		return s.reloadBIRD()
 	case ActionBIRDStatus:
 		return s.statusBIRD()
+	case ActionWGStart:
+		return s.startWG()
+	case ActionWGStop:
+		return s.stopWG()
+	case ActionWGRestart:
+		return s.restartWG()
 	case ActionWGStatus:
 		return s.statusWG()
 	default:

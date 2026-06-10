@@ -36,6 +36,18 @@ func (s *Server) getWGStatus(w http.ResponseWriter, r *http.Request) {
 	s.supervisorAction(w, r, supervisor.ActionWGStatus)
 }
 
+func (s *Server) postWGStart(w http.ResponseWriter, r *http.Request) {
+	s.supervisorAction(w, r, supervisor.ActionWGStart)
+}
+
+func (s *Server) postWGStop(w http.ResponseWriter, r *http.Request) {
+	s.supervisorAction(w, r, supervisor.ActionWGStop)
+}
+
+func (s *Server) postWGRestart(w http.ResponseWriter, r *http.Request) {
+	s.supervisorAction(w, r, supervisor.ActionWGRestart)
+}
+
 func (s *Server) postWGConfig(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		_ = r.Body.Close()
