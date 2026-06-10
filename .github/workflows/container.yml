@@ -68,6 +68,7 @@ jobs:
     name: Build ${{ matrix.arch }}
     needs: plan
     runs-on: ubuntu-24.04
+    environment: Build
     strategy:
       fail-fast: false
       matrix:
