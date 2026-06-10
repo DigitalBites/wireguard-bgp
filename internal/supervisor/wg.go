@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"peplink-wg-bgp/internal/wg"
 )
@@ -16,6 +18,12 @@ const (
 	DefaultWGConfigPath = "/app-state/wireguard/wg0.conf"
 	DefaultWGInterface  = "wg0"
 	DefaultWGMTU        = 1320
+	DefaultWGUAPIDir    = "/run/wireguard"
+)
+
+const (
+	defaultWGReadyTimeout = 3 * time.Second
+	defaultWGReadyPoll    = 100 * time.Millisecond
 )
 
 type WGManager interface {
@@ -45,6 +53,9 @@ type WGProcessManager struct {
 	MTU        int
 	Runner     CommandRunner
 	Starter    ProcessStarter
+	UAPIDir    string
+	ReadyAfter time.Duration
+	ReadyEvery time.Duration
 
 	mu      sync.Mutex
 	process Process
@@ -196,7 +207,40 @@ func (m *WGProcessManager) ensureInterface(ctx context.Context, out *bytes.Buffe
 		return fmt.Errorf("create WireGuard interface with kernel or wireguard-go: %w", err)
 	}
 	m.process = proc
+	if err := m.waitForUserspaceInterface(ctx); err != nil {
+		_ = m.killLocked()
+		return err
+	}
+	out.WriteString("wireguard-go interface ready\n")
 	return nil
+}
+
+func (m *WGProcessManager) waitForUserspaceInterface(ctx context.Context) error {
+	deadline := time.NewTimer(m.readyTimeout())
+	defer deadline.Stop()
+	ticker := time.NewTicker(m.readyPoll())
+	defer ticker.Stop()
+
+	for {
+		if m.userspaceInterfaceReady(ctx) {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			return fmt.Errorf("wireguard-go did not create %s before timeout", m.uapiSocketPath())
+		case <-ticker.C:
+		}
+	}
+}
+
+func (m *WGProcessManager) userspaceInterfaceReady(ctx context.Context) bool {
+	if _, err := os.Stat(m.uapiSocketPath()); err != nil {
+		return false
+	}
+	_, err := m.runner().Run(ctx, "ip", "link", "show", "dev", m.iface())
+	return err == nil
 }
 
 func isMissingInterfaceOutput(output string) bool {
@@ -307,6 +351,28 @@ func (m *WGProcessManager) runner() CommandRunner {
 		return ExecRunner{}
 	}
 	return m.Runner
+}
+
+func (m *WGProcessManager) uapiSocketPath() string {
+	dir := m.UAPIDir
+	if dir == "" {
+		dir = DefaultWGUAPIDir
+	}
+	return filepath.Join(dir, m.iface()+".sock")
+}
+
+func (m *WGProcessManager) readyTimeout() time.Duration {
+	if m.ReadyAfter == 0 {
+		return defaultWGReadyTimeout
+	}
+	return m.ReadyAfter
+}
+
+func (m *WGProcessManager) readyPoll() time.Duration {
+	if m.ReadyEvery == 0 {
+		return defaultWGReadyPoll
+	}
+	return m.ReadyEvery
 }
 
 func (m *WGProcessManager) starter() ProcessStarter {

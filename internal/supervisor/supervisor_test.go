@@ -20,6 +20,7 @@ type recordingRunner struct {
 	output  string
 	err     error
 	outputs map[string]string
+	errOnce map[string]error
 	errs    map[string]error
 }
 
@@ -31,6 +32,12 @@ func (r *recordingRunner) Run(ctx context.Context, name string, args ...string) 
 	if r.outputs != nil {
 		if output, ok := r.outputs[commandLine]; ok {
 			return output, r.errs[commandLine]
+		}
+	}
+	if r.errOnce != nil {
+		if err, ok := r.errOnce[commandLine]; ok {
+			delete(r.errOnce, commandLine)
+			return r.output, err
 		}
 	}
 	if r.errs != nil {
@@ -468,22 +475,74 @@ PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 Endpoint = 172.17.62.1:51820
 AllowedIPs = 0.0.0.0/0
-`), 0o600); err != nil {
+	`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	uapiDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(uapiDir, "wg0.sock"), []byte{}, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	runner := &recordingRunner{
+		errOnce: map[string]error{
+			"ip link show dev wg0": errors.New("missing"),
+		},
 		errs: map[string]error{
-			"ip link show dev wg0":               errors.New("missing"),
 			"ip link add dev wg0 type wireguard": errors.New("not supported"),
 		},
 	}
 	starter := &recordingStarter{}
-	manager := &WGProcessManager{ConfigPath: configPath, Runner: runner, Starter: starter}
+	manager := &WGProcessManager{ConfigPath: configPath, Runner: runner, Starter: starter, UAPIDir: uapiDir}
 	if _, err := manager.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if starter.name != "wireguard-go" || strings.Join(starter.args, " ") != "wg0" {
 		t.Fatalf("unexpected fallback start command: %s %#v", starter.name, starter.args)
+	}
+	wantPrefix := []string{
+		"ip link show dev wg0",
+		"ip link add dev wg0 type wireguard",
+		"ip link show dev wg0",
+	}
+	if strings.Join(runner.calls[:3], "|") != strings.Join(wantPrefix, "|") {
+		t.Fatalf("unexpected fallback readiness calls: %#v", runner.calls)
+	}
+}
+
+func TestWGProcessManagerStartFailsWhenWireguardGoSocketNotReady(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "wg0.conf")
+	if err := os.WriteFile(configPath, []byte(`[Interface]
+PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+
+[Peer]
+PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+Endpoint = 172.17.62.1:51820
+AllowedIPs = 0.0.0.0/0
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runner := &recordingRunner{
+		errOnce: map[string]error{
+			"ip link show dev wg0": errors.New("missing"),
+		},
+		errs: map[string]error{
+			"ip link add dev wg0 type wireguard": errors.New("not supported"),
+		},
+	}
+	starter := &recordingStarter{}
+	manager := &WGProcessManager{
+		ConfigPath: configPath,
+		Runner:     runner,
+		Starter:    starter,
+		UAPIDir:    t.TempDir(),
+		ReadyAfter: time.Millisecond,
+		ReadyEvery: time.Millisecond,
+	}
+	_, err := manager.Start(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "wireguard-go did not create") {
+		t.Fatalf("expected wireguard-go readiness error, got %v", err)
+	}
+	if starter.process == nil || !starter.process.killed {
+		t.Fatal("expected failed wireguard-go process to be killed")
 	}
 }
 
