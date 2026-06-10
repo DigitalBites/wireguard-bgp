@@ -24,6 +24,67 @@ function csrfHeaders(extra = {}) {
   return token ? {...extra, 'X-CSRF-Token': token} : extra;
 }
 
+async function runRoutingAction(action) {
+  const message = document.querySelector('#routing-message');
+  const steps = document.querySelector('#routing-steps');
+  const buttons = [...document.querySelectorAll('[data-routing-action]')];
+  if (!message || !steps) return;
+  setRoutingBusy(buttons, true);
+  message.textContent = `${labelForAction(action)} running`;
+  steps.replaceChildren();
+  try {
+    const res = await fetch(`/api/routing/${action}`, {
+      method: 'POST',
+      headers: csrfHeaders(),
+    });
+    const body = await res.json().catch(() => ({}));
+    renderRoutingResult(steps, body.steps || []);
+    message.textContent = body.ok ? `${labelForAction(action)} complete` : `${labelForAction(action)} failed`;
+    await refreshStatus();
+  } catch (err) {
+    message.textContent = `${labelForAction(action)} failed`;
+    renderRoutingResult(steps, [{action, ok: false, error: err.message || String(err)}]);
+  } finally {
+    setRoutingBusy(buttons, false);
+  }
+}
+
+function renderRoutingResult(el, steps) {
+  el.replaceChildren();
+  if (!steps.length) {
+    const item = document.createElement('li');
+    item.textContent = 'No steps returned';
+    item.className = 'step-error';
+    el.append(item);
+    return;
+  }
+  steps.forEach((step) => {
+    const item = document.createElement('li');
+    const action = document.createElement('span');
+    const state = document.createElement('span');
+    const detail = document.createElement('pre');
+    action.textContent = step.action || 'unknown';
+    state.textContent = step.ok ? 'ok' : 'error';
+    item.className = step.ok ? 'step-ok' : 'step-error';
+    item.append(action, state);
+    if (step.output || step.error) {
+      detail.textContent = step.output || step.error;
+      item.append(detail);
+    }
+    el.append(item);
+  });
+}
+
+function setRoutingBusy(buttons, busy) {
+  buttons.forEach((button) => {
+    button.disabled = busy;
+  });
+}
+
+function labelForAction(action) {
+  return action.charAt(0).toUpperCase() + action.slice(1);
+}
+
 async function refreshDiag(el) {
   const name = el.dataset.diag;
   const res = await fetch(`/api/diag/${name}`);
@@ -94,6 +155,10 @@ if (birdForm) birdForm.addEventListener('submit', saveBirdConfig);
 
 const saveWG = document.querySelector('#save-wg');
 if (saveWG) saveWG.addEventListener('click', saveWireGuardConfig);
+
+document.querySelectorAll('[data-routing-action]').forEach((button) => {
+  button.addEventListener('click', () => runRoutingAction(button.dataset.routingAction));
+});
 
 if (window.EventSource) {
   const events = new EventSource('/api/events');

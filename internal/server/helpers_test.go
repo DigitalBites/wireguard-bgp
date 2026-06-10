@@ -117,16 +117,23 @@ func assertSupervisorStopped(t *testing.T, errCh <-chan error) {
 }
 
 type serverSupervisorTestRunner struct {
-	name   string
-	args   []string
-	calls  []string
-	output string
+	name    string
+	args    []string
+	calls   []string
+	output  string
+	outputs map[string]string
 }
 
 func (r *serverSupervisorTestRunner) Run(ctx context.Context, name string, args ...string) (string, error) {
 	r.name = name
 	r.args = append([]string(nil), args...)
-	r.calls = append(r.calls, strings.TrimSpace(name+" "+strings.Join(args, " ")))
+	commandLine := strings.TrimSpace(name + " " + strings.Join(args, " "))
+	r.calls = append(r.calls, commandLine)
+	if r.outputs != nil {
+		if output, ok := r.outputs[commandLine]; ok {
+			return output, nil
+		}
+	}
 	if r.output != "" {
 		return r.output, nil
 	}

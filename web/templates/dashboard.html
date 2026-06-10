@@ -19,6 +19,19 @@
     </nav>
   </header>
   <main class="grid">
+    <section class="panel routing-panel">
+      <div class="panel-head">
+        <h2>Routing</h2>
+        <span id="routing-message" class="status-pill">Ready</span>
+      </div>
+      <div class="control-row" aria-label="Routing lifecycle controls">
+        <button type="button" data-routing-action="start">Start</button>
+        <button type="button" data-routing-action="apply">Apply</button>
+        <button type="button" data-routing-action="restart">Restart</button>
+        <button type="button" class="secondary danger" data-routing-action="stop">Stop</button>
+      </div>
+      <ol id="routing-steps" class="step-list"></ol>
+    </section>
     <section class="panel">
       <h2>WireGuard</h2>
       <dl id="wg-status"><dt>State</dt><dd>Loading</dd></dl>
