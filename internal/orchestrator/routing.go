@@ -31,6 +31,7 @@ type Result struct {
 func (r Routing) Apply(ctx context.Context) Result {
 	return r.run(ctx, []string{
 		supervisor.ActionWGRestart,
+		supervisor.ActionRoutesApply,
 		supervisor.ActionBIRDStart,
 		supervisor.ActionBIRDReload,
 	})
@@ -39,6 +40,7 @@ func (r Routing) Apply(ctx context.Context) Result {
 func (r Routing) Start(ctx context.Context) Result {
 	return r.run(ctx, []string{
 		supervisor.ActionWGStart,
+		supervisor.ActionRoutesApply,
 		supervisor.ActionBIRDStart,
 		supervisor.ActionBIRDReload,
 	})
@@ -55,6 +57,7 @@ func (r Routing) Restart(ctx context.Context) Result {
 	return r.run(ctx, []string{
 		supervisor.ActionBIRDStop,
 		supervisor.ActionWGRestart,
+		supervisor.ActionRoutesApply,
 		supervisor.ActionBIRDStart,
 		supervisor.ActionBIRDReload,
 	})

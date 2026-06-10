@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"peplink-wg-bgp/internal/config"
 )
 
 type recordingRunner struct {
@@ -74,6 +76,15 @@ func (m *fakeWGManager) Stop(ctx context.Context) (string, error) {
 func (m *fakeWGManager) Restart(ctx context.Context) (string, error) {
 	m.restarted = true
 	return "restarted\n", nil
+}
+
+type fakeRouteManager struct {
+	applied bool
+}
+
+func (m *fakeRouteManager) Apply(ctx context.Context) (string, error) {
+	m.applied = true
+	return "routes applied\n", nil
 }
 
 func TestSupervisorPing(t *testing.T) {
@@ -251,6 +262,17 @@ func TestSupervisorWGLifecycleDispatchesToManager(t *testing.T) {
 	}
 }
 
+func TestSupervisorRoutesApplyDispatchesToManager(t *testing.T) {
+	manager := &fakeRouteManager{}
+	resp := (Server{RouteManager: manager}).dispatch(Request{Action: ActionRoutesApply})
+	if !resp.OK {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+	if !manager.applied {
+		t.Fatal("expected route manager to be called")
+	}
+}
+
 func TestWGProcessManagerStartRunsExpectedSequence(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "wg0.conf")
 	if err := os.WriteFile(configPath, []byte(`[Interface]
@@ -290,6 +312,78 @@ AllowedIPs = 0.0.0.0/0
 	}
 	if out == "" {
 		t.Fatal("expected command output")
+	}
+}
+
+func TestRouteApplyManagerRunsExpectedSequence(t *testing.T) {
+	dir := t.TempDir()
+	appPath := filepath.Join(dir, "app.yaml")
+	wgPath := filepath.Join(dir, "wg0.conf")
+	cfg := config.Default()
+	cfg.ConfigDir = dir
+	cfg.BIRDConfigPath = filepath.Join(dir, "bird", "bird.conf")
+	cfg.BIRD.LocalASN = 65060
+	cfg.BIRD.PeerASN = 65001
+	cfg.BIRD.PeerIP = "192.168.50.1"
+	if err := config.Save(appPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(wgPath, []byte(`[Interface]
+PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+
+[Peer]
+PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+Endpoint = 172.17.62.1:51820
+AllowedIPs = 0.0.0.0/0
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runner := &recordingRunner{output: "default via 172.32.0.1 dev eth0\n"}
+	manager := &RouteApplyManager{
+		AppConfigPath: appPath,
+		WGConfigPath:  wgPath,
+		Runner:        runner,
+	}
+	if _, err := manager.Apply(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"ip route show default dev eth0",
+		"ip route replace 172.17.62.1/32 via 172.32.0.1 dev eth0",
+		"ip route replace 0.0.0.0/1 dev wg0",
+		"ip route replace 128.0.0.0/1 dev wg0",
+	}
+	if strings.Join(runner.calls, "|") != strings.Join(want, "|") {
+		t.Fatalf("unexpected calls: %#v", runner.calls)
+	}
+}
+
+func TestRouteApplyManagerRejectsHostnameEndpoint(t *testing.T) {
+	dir := t.TempDir()
+	appPath := filepath.Join(dir, "app.yaml")
+	wgPath := filepath.Join(dir, "wg0.conf")
+	cfg := config.Default()
+	cfg.ConfigDir = dir
+	cfg.BIRDConfigPath = filepath.Join(dir, "bird", "bird.conf")
+	cfg.BIRD.LocalASN = 65060
+	cfg.BIRD.PeerASN = 65001
+	cfg.BIRD.PeerIP = "192.168.50.1"
+	if err := config.Save(appPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(wgPath, []byte(`[Interface]
+PrivateKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+
+[Peer]
+PublicKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+Endpoint = vpn.example.test:51820
+AllowedIPs = 0.0.0.0/0
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manager := &RouteApplyManager{AppConfigPath: appPath, WGConfigPath: wgPath}
+	if _, err := manager.Apply(context.Background()); err == nil {
+		t.Fatal("expected hostname endpoint error")
 	}
 }
 

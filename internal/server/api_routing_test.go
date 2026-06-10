@@ -29,7 +29,8 @@ func TestRoutingApplyOrchestratesSupervisorActions(t *testing.T) {
 	manager := &routingWGManagerTestDouble{
 		restartOutput: "wg restarted\n",
 	}
-	runner, srv, stop := newSupervisorBackedTestServerWithWG(t, manager)
+	routeManager := &routingRouteManagerTestDouble{output: "routes applied\n"}
+	runner, srv, stop := newSupervisorBackedTestServerWithManagers(t, manager, routeManager)
 	defer stop()
 	req := httptest.NewRequest(http.MethodPost, "/api/routing/apply", nil)
 	addCSRF(t, srv, req)
@@ -46,7 +47,7 @@ func TestRoutingApplyOrchestratesSupervisorActions(t *testing.T) {
 		t.Fatalf("unexpected result: %#v", result)
 	}
 	gotActions := routingResultActions(result)
-	wantActions := []string{supervisor.ActionWGRestart, supervisor.ActionBIRDStart, supervisor.ActionBIRDReload}
+	wantActions := []string{supervisor.ActionWGRestart, supervisor.ActionRoutesApply, supervisor.ActionBIRDStart, supervisor.ActionBIRDReload}
 	if !reflect.DeepEqual(gotActions, wantActions) {
 		t.Fatalf("actions=%#v", gotActions)
 	}
@@ -59,6 +60,9 @@ func TestRoutingApplyOrchestratesSupervisorActions(t *testing.T) {
 	}
 	if !manager.restarted {
 		t.Fatal("expected WireGuard restart")
+	}
+	if !routeManager.applied {
+		t.Fatal("expected routes apply")
 	}
 }
 
@@ -106,6 +110,16 @@ type routingWGManagerTestDouble struct {
 	started       bool
 	stopped       bool
 	restarted     bool
+}
+
+type routingRouteManagerTestDouble struct {
+	output  string
+	applied bool
+}
+
+func (m *routingRouteManagerTestDouble) Apply(ctx context.Context) (string, error) {
+	m.applied = true
+	return m.output, nil
 }
 
 func (m *routingWGManagerTestDouble) Start(ctx context.Context) (string, error) {

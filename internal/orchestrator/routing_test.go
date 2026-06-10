@@ -25,7 +25,7 @@ func (c *recordingClient) Call(ctx context.Context, action string) (supervisor.R
 func TestRoutingApplyOrder(t *testing.T) {
 	client := &recordingClient{}
 	result := (Routing{Client: client}).Apply(context.Background())
-	want := []string{supervisor.ActionWGRestart, supervisor.ActionBIRDStart, supervisor.ActionBIRDReload}
+	want := []string{supervisor.ActionWGRestart, supervisor.ActionRoutesApply, supervisor.ActionBIRDStart, supervisor.ActionBIRDReload}
 	if !result.OK || !reflect.DeepEqual(client.calls, want) {
 		t.Fatalf("calls=%#v result=%#v", client.calls, result)
 	}
@@ -34,7 +34,7 @@ func TestRoutingApplyOrder(t *testing.T) {
 func TestRoutingStartOrder(t *testing.T) {
 	client := &recordingClient{}
 	result := (Routing{Client: client}).Start(context.Background())
-	want := []string{supervisor.ActionWGStart, supervisor.ActionBIRDStart, supervisor.ActionBIRDReload}
+	want := []string{supervisor.ActionWGStart, supervisor.ActionRoutesApply, supervisor.ActionBIRDStart, supervisor.ActionBIRDReload}
 	if !result.OK || !reflect.DeepEqual(client.calls, want) {
 		t.Fatalf("calls=%#v result=%#v", client.calls, result)
 	}
@@ -52,20 +52,20 @@ func TestRoutingStopOrder(t *testing.T) {
 func TestRoutingRestartOrder(t *testing.T) {
 	client := &recordingClient{}
 	result := (Routing{Client: client}).Restart(context.Background())
-	want := []string{supervisor.ActionBIRDStop, supervisor.ActionWGRestart, supervisor.ActionBIRDStart, supervisor.ActionBIRDReload}
+	want := []string{supervisor.ActionBIRDStop, supervisor.ActionWGRestart, supervisor.ActionRoutesApply, supervisor.ActionBIRDStart, supervisor.ActionBIRDReload}
 	if !result.OK || !reflect.DeepEqual(client.calls, want) {
 		t.Fatalf("calls=%#v result=%#v", client.calls, result)
 	}
 }
 
 func TestRoutingStopsOnFailure(t *testing.T) {
-	client := &recordingClient{fail: supervisor.ActionBIRDStart}
+	client := &recordingClient{fail: supervisor.ActionRoutesApply}
 	result := (Routing{Client: client}).Start(context.Background())
-	want := []string{supervisor.ActionWGStart, supervisor.ActionBIRDStart}
+	want := []string{supervisor.ActionWGStart, supervisor.ActionRoutesApply}
 	if result.OK || !reflect.DeepEqual(client.calls, want) {
 		t.Fatalf("calls=%#v result=%#v", client.calls, result)
 	}
-	if got := ActionSummary(result); got != "wg.start:ok,bird.start:error" {
+	if got := ActionSummary(result); got != "wg.start:ok,routes.apply:error" {
 		t.Fatalf("summary = %q", got)
 	}
 }

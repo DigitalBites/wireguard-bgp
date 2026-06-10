@@ -22,6 +22,8 @@ func (s Server) dispatch(req Request) Response {
 		return s.restartWG()
 	case ActionWGStatus:
 		return s.statusWG()
+	case ActionRoutesApply:
+		return s.applyRoutes()
 	default:
 		return Response{OK: false, Action: req.Action, Error: fmt.Sprintf("unknown supervisor action %q", req.Action)}
 	}

@@ -4,6 +4,7 @@ import "time"
 
 const (
 	DefaultSocketPath     = "/run/peplink-wg-bgp/supervisor.sock"
+	DefaultAppConfigPath  = "/app-state/app.yaml"
 	DefaultBIRDConfigPath = "/app-state/bird/bird.conf"
 	DefaultBIRDSocketPath = "/run/bird/bird.ctl"
 	ActionPing            = "ping"
@@ -15,6 +16,7 @@ const (
 	ActionWGStop          = "wg.stop"
 	ActionWGRestart       = "wg.restart"
 	ActionWGStatus        = "wg.status"
+	ActionRoutesApply     = "routes.apply"
 )
 
 type Request struct {
@@ -34,6 +36,8 @@ type Server struct {
 	CommandTimeout time.Duration
 	Runner         CommandRunner
 	WGManager      WGManager
+	RouteManager   RouteManager
+	AppConfigPath  string
 	BIRDConfigPath string
 	BIRDSocketPath string
 }

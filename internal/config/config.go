@@ -21,9 +21,10 @@ type App struct {
 }
 
 type WireGuard struct {
-	Interface        string `json:"interface" yaml:"interface"`
-	MTU              int    `json:"mtu" yaml:"mtu"`
-	EndpointRouteVia string `json:"endpointRouteVia,omitempty" yaml:"endpointRouteVia,omitempty"`
+	Interface              string `json:"interface" yaml:"interface"`
+	MTU                    int    `json:"mtu" yaml:"mtu"`
+	EndpointRouteInterface string `json:"endpointRouteInterface,omitempty" yaml:"endpointRouteInterface,omitempty"`
+	EndpointRouteVia       string `json:"endpointRouteVia,omitempty" yaml:"endpointRouteVia,omitempty"`
 }
 
 func Default() App {
@@ -32,8 +33,9 @@ func Default() App {
 		ConfigDir:      "/app-state",
 		BIRDConfigPath: "/app-state/bird/bird.conf",
 		WireGuard: WireGuard{
-			Interface: "wg0",
-			MTU:       1320,
+			Interface:              "wg0",
+			MTU:                    1320,
+			EndpointRouteInterface: "eth0",
 		},
 		BIRD: bird.Config{
 			Interface:        "wg0",
@@ -69,6 +71,9 @@ func Load(path string) (App, error) {
 	if cfg.WireGuard.MTU == 0 {
 		cfg.WireGuard.MTU = 1320
 	}
+	if cfg.WireGuard.EndpointRouteInterface == "" {
+		cfg.WireGuard.EndpointRouteInterface = "eth0"
+	}
 	cfg.BIRD = cfg.BIRD.WithDefaults()
 	return cfg, nil
 }
@@ -91,6 +96,9 @@ func ValidateManagedPaths(cfg App) error {
 	}
 	if err := bird.ValidateInterfaceName(cfg.WireGuard.Interface); err != nil {
 		return fmt.Errorf("wireguard interface is invalid: %w", err)
+	}
+	if err := bird.ValidateInterfaceName(cfg.WireGuard.EndpointRouteInterface); err != nil {
+		return fmt.Errorf("wireguard endpoint route interface is invalid: %w", err)
 	}
 	if cfg.WireGuard.MTU < 576 || cfg.WireGuard.MTU > 9000 {
 		return fmt.Errorf("wireguard MTU must be 576-9000")

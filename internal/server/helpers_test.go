@@ -67,15 +67,21 @@ func newSupervisorBackedTestServer(t *testing.T) (*serverSupervisorTestRunner, *
 
 func newSupervisorBackedTestServerWithWG(t *testing.T, manager supervisor.WGManager) (*serverSupervisorTestRunner, *Server, func()) {
 	t.Helper()
+	return newSupervisorBackedTestServerWithManagers(t, manager, nil)
+}
+
+func newSupervisorBackedTestServerWithManagers(t *testing.T, manager supervisor.WGManager, routeManager supervisor.RouteManager) (*serverSupervisorTestRunner, *Server, func()) {
+	t.Helper()
 	socketPath := filepath.Join(t.TempDir(), "supervisor.sock")
 	ctx, cancel := context.WithCancel(context.Background())
 	runner := &serverSupervisorTestRunner{}
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- (supervisor.Server{
-			SocketPath: socketPath,
-			Runner:     runner,
-			WGManager:  manager,
+			SocketPath:   socketPath,
+			Runner:       runner,
+			WGManager:    manager,
+			RouteManager: routeManager,
 		}).Serve(ctx)
 	}()
 	waitForSupervisor(t, socketPath)
