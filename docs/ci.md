@@ -19,6 +19,20 @@ If `DOCKERHUB_IMAGE` is unset, workflows use `digitalbites/wireguard-bgp`.
 If `BUILD_ARCHES` is unset, workflows use the default from
 `scripts/ci-versions.env`.
 
+## Tool Versions
+
+`scripts/ci-versions.env` is the shared source for pinned build and check tool
+versions:
+
+- `GO_VERSION` controls GitHub Actions `setup-go`, local `make check` version
+  validation, and the Docker builder image.
+- `GOLANGCI_LINT_VERSION` controls the installed `golangci-lint` version.
+- `GOVULNCHECK_VERSION` controls the installed `govulncheck` version.
+- `TRIVY_IMAGE` controls the image scanner container tag.
+
+Keep `go.mod` aligned with `GO_VERSION`; the CI setup intentionally reads the
+shared version file instead of inferring the toolchain from `go.mod`.
+
 ## Local Commands
 
 Run the Go quality gate and vulnerability scan:
@@ -118,8 +132,8 @@ The CI workflow runs:
 
 Tool installs and GitHub Actions are pinned to exact versions in workflow YAML;
 avoid `@latest` and broad moving action tags for the build path.
-Pinned Go tool versions, the Trivy image tag, default build arches, and initial
-version live in `scripts/ci-versions.env`.
+Pinned Go/tool versions, the Trivy image tag, default build arches, and initial
+image version live in `scripts/ci-versions.env`.
 
 GitHub jobs use `ubuntu-24.04` instead of `ubuntu-latest`. This pins the runner
 image family, but GitHub-hosted runners still receive patch refreshes from

@@ -8,6 +8,7 @@ cd "$ROOT_DIR"
 . ./scripts/ci-versions.env
 
 IMAGE_NAME="${IMAGE_NAME:-digitalbites/wireguard-bgp}"
+GO_VERSION="${GO_VERSION:?GO_VERSION must be set by ./scripts/ci-versions.env}"
 CHANNEL="${CHANNEL:-local}"
 BASE_VERSION="${BASE_VERSION:-$(./scripts/resolve-version.sh)}"
 VERSION="${VERSION:-$BASE_VERSION}"
@@ -45,6 +46,7 @@ esac
 
 set -- docker buildx build \
   --platform "$PLATFORM" \
+  --build-arg "GO_VERSION=$GO_VERSION" \
   --label "org.opencontainers.image.created=$CREATED" \
   --label "org.opencontainers.image.revision=$SHORT_SHA" \
   --label "org.opencontainers.image.version=$TAG_VERSION" \
