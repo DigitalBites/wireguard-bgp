@@ -1,0 +1,20 @@
+package supervisor
+
+import "fmt"
+
+func (s Server) dispatch(req Request) Response {
+	switch req.Action {
+	case ActionPing:
+		return Response{OK: true, Action: req.Action, Output: "pong"}
+	case ActionBIRDStart:
+		return s.startBIRD()
+	case ActionBIRDReload:
+		return s.reloadBIRD()
+	case ActionBIRDStatus:
+		return s.statusBIRD()
+	case ActionWGStatus:
+		return s.statusWG()
+	default:
+		return Response{OK: false, Action: req.Action, Error: fmt.Sprintf("unknown supervisor action %q", req.Action)}
+	}
+}
