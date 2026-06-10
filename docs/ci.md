@@ -5,10 +5,15 @@ same shell scripts available for local use.
 
 ## Required GitHub Settings
 
-Set these repository secrets:
+Set these repository secrets, or set them as secrets in the GitHub environment
+named `Build`:
 
 - `DOCKERHUB_USERNAME`
 - `DOCKERHUB_TOKEN`
+
+The container workflow attaches the image-publishing job to the `Build`
+environment so environment-scoped Docker Hub credentials are visible to
+`docker/login-action`.
 
 Optional repository variable:
 
