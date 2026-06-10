@@ -56,7 +56,7 @@ ARCH=amd64 PLATFORM=linux/amd64 CHANNEL=local LOAD=true ./scripts/docker-build.s
 Scan a local image:
 
 ```sh
-IMAGE_REF=digitalbites/wireguard-bgp:v0.0.1-amd64-local ./scripts/image-scan.sh
+IMAGE_REF=digitalbites/wireguard-bgp:v0.0.1-amd64-local IMAGE_PLATFORM=linux/amd64 ./scripts/image-scan.sh
 ```
 
 Build an arm64 image without loading it into the local Docker image store:
@@ -147,4 +147,6 @@ self-hosted runner.
 
 The container workflow builds `linux/amd64` and `linux/arm64` images, pushes
 only on `main`, manual release dispatch, or version tags, and scans built images
-with Trivy through `scripts/image-scan.sh`.
+with Trivy through `scripts/image-scan.sh`. The workflow passes the resolved
+platform to Trivy so arch-specific tags such as `*-arm64` are scanned as
+`linux/arm64` even though GitHub-hosted runners are amd64.

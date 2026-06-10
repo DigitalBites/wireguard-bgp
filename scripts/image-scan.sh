@@ -8,6 +8,7 @@ cd "$ROOT_DIR"
 . ./scripts/ci-versions.env
 
 IMAGE_REF="${IMAGE_REF:-}"
+IMAGE_PLATFORM="${IMAGE_PLATFORM:-${TRIVY_PLATFORM:-}}"
 TRIVY_IMAGE="${TRIVY_IMAGE:-$TRIVY_IMAGE}"
 TRIVY_SEVERITY="${TRIVY_SEVERITY:-HIGH,CRITICAL}"
 TRIVY_EXIT_CODE="${TRIVY_EXIT_CODE:-1}"
@@ -24,11 +25,18 @@ fi
 
 mkdir -p .trivy-cache
 
-docker run --rm \
+set -- docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$ROOT_DIR/.trivy-cache:/root/.cache/" \
   "$TRIVY_IMAGE" image \
   --severity "$TRIVY_SEVERITY" \
   --ignore-unfixed \
   --exit-code "$TRIVY_EXIT_CODE" \
-  "$IMAGE_REF"
+  --skip-version-check
+
+if [ -n "$IMAGE_PLATFORM" ]; then
+  set -- "$@" --platform "$IMAGE_PLATFORM"
+fi
+
+set -- "$@" "$IMAGE_REF"
+"$@"

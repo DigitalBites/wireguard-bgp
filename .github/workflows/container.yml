@@ -168,4 +168,5 @@ jobs:
         if: steps.meta.outputs.push == 'true' || steps.arch.outputs.scan_local == 'true'
         env:
           IMAGE_REF: ${{ steps.build.outputs.primary_tag }}
+          IMAGE_PLATFORM: ${{ steps.arch.outputs.platform }}
         run: ./scripts/image-scan.sh
