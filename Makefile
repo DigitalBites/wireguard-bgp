@@ -1,7 +1,7 @@
 GO_PACKAGES := ./...
 APP := ./cmd/peplink-wg-bgp
 
-.PHONY: fmt fmt-check test vet lint build check clean
+.PHONY: fmt fmt-check test vet lint build go-check check ci-check ci-tools docker-build docker-build-all image-scan clean
 
 fmt:
 	gofmt -w cmd internal web
@@ -21,7 +21,24 @@ lint:
 build:
 	go build $(APP)
 
-check: fmt-check test vet lint build
+go-check: fmt-check test vet lint build
+
+check: ci-check
+
+ci-tools:
+	./scripts/install-ci-tools.sh
+
+ci-check:
+	./scripts/ci-check.sh
+
+docker-build:
+	./scripts/docker-build.sh
+
+docker-build-all:
+	./scripts/docker-build-all.sh
+
+image-scan:
+	./scripts/image-scan.sh
 
 clean:
 	rm -f peplink-wg-bgp
