@@ -1,0 +1,23 @@
+{{ define "diagnostics.html" }}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ .CSRFToken }}">
+  <title>Peplink WG BGP - Diagnostics</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Diagnostics</h1>
+    <nav><a href="/">Dashboard</a><a href="/config">Config</a><a class="active" href="/diagnostics">Diagnostics</a><a href="/logs">Logs</a></nav>
+  </header>
+  <main class="stack">
+    <section class="panel"><h2>Routes</h2><pre data-diag="routes">Loading</pre></section>
+    <section class="panel"><h2>Addresses</h2><pre data-diag="addresses">Loading</pre></section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
+{{ end }}

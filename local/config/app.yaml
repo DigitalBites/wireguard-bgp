@@ -1,0 +1,15 @@
+listenAddr: :8080
+configDir: /config
+birdConfigPath: /etc/bird.conf
+wireGuard:
+    interface: wg0
+    mtu: 1320
+bird:
+    routerId: 192.168.50.67
+    localAsn: 65060
+    peerAsn: 65001
+    peerIp: 192.168.50.1
+    interface: wg0
+    advertisedRoutes:
+        - 0.0.0.0/1
+        - 128.0.0.0/1

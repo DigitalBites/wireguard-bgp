@@ -1,0 +1,34 @@
+{{ define "dashboard.html" }}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ .CSRFToken }}">
+  <title>Peplink WG BGP - Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Peplink WG BGP</h1>
+    <nav>
+      <a class="active" href="/">Dashboard</a>
+      <a href="/config">Config</a>
+      <a href="/diagnostics">Diagnostics</a>
+      <a href="/logs">Logs</a>
+    </nav>
+  </header>
+  <main class="grid">
+    <section class="panel">
+      <h2>WireGuard</h2>
+      <dl id="wg-status"><dt>State</dt><dd>Loading</dd></dl>
+    </section>
+    <section class="panel">
+      <h2>BGP</h2>
+      <dl id="bird-status"><dt>State</dt><dd>Loading</dd></dl>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
+{{ end }}

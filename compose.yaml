@@ -1,0 +1,23 @@
+services:
+  peplink-wg-bgp:
+    build: .
+    image: peplink-wg-bgp:local
+    ports:
+      - "8080:8080"
+    cap_add:
+      - NET_ADMIN
+      - SETGID
+      - SETUID
+    cap_drop:
+      - ALL
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ./local/app-state:/app-state
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.32.0.0/16

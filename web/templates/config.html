@@ -1,0 +1,42 @@
+{{ define "config.html" }}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ .CSRFToken }}">
+  <title>Peplink WG BGP - Configuration</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Configuration</h1>
+    <nav><a href="/">Dashboard</a><a class="active" href="/config">Config</a><a href="/diagnostics">Diagnostics</a><a href="/logs">Logs</a></nav>
+  </header>
+  <main class="stack">
+    <section class="panel">
+      <h2>WireGuard</h2>
+      <textarea id="wg-config" placeholder="Paste wg0.conf"></textarea>
+      <div class="actions"><button id="save-wg" type="button">Save WireGuard</button><span id="wg-message"></span></div>
+    </section>
+    <section class="panel">
+      <h2>BIRD</h2>
+      <form id="bird-form">
+        <div class="form-grid">
+          <label>Router ID<input name="routerId" placeholder="192.168.50.67"></label>
+          <label>Local ASN<input name="localAsn" type="number" min="1" max="4294967295" placeholder="65060"></label>
+          <label>Peer ASN<input name="peerAsn" type="number" min="1" max="4294967295" placeholder="65001"></label>
+          <label>Peer IP<input name="peerIp" placeholder="192.168.50.1"></label>
+          <label>Interface<input name="interface" placeholder="wg0"></label>
+        </div>
+        <label>Advertised routes<textarea name="advertisedRoutes" placeholder="0.0.0.0/1&#10;128.0.0.0/1"></textarea></label>
+        <div class="actions"><button type="submit">Save BIRD</button><span id="bird-message"></span></div>
+      </form>
+      <h2>Generated Preview</h2>
+      <pre id="bird-preview">Loading</pre>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
+{{ end }}

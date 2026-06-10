@@ -1,0 +1,23 @@
+{{ define "login.html" }}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Peplink WG BGP - Login</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="login">
+    <section class="panel login-panel">
+      <h1>Peplink WG BGP</h1>
+      <form method="post" action="/login">
+        <label for="token">Login token</label>
+        <input id="token" name="token" type="password" autocomplete="one-time-code" autofocus>
+        <button type="submit">Sign in</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
+{{ end }}
