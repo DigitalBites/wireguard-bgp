@@ -17,6 +17,7 @@ func (s *Server) getWGConfig(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{
 			"path":   path,
 			"exists": false,
+			"config": "",
 			"meta":   wg.ConfigMeta{},
 		})
 		return
@@ -28,7 +29,8 @@ func (s *Server) getWGConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{
 		"path":   path,
 		"exists": true,
-		"meta":   wg.ParseConfig(string(data)),
+		"config": wg.RedactConfig(string(data)),
+		"meta":   redactedWGMeta(wg.ParseConfig(string(data))),
 	})
 }
 
@@ -57,23 +59,45 @@ func (s *Server) postWGConfig(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	meta, err := wg.ValidateConfig(string(data))
+	path := s.wgConfigPath()
+	existing, readErr := os.ReadFile(path)
+	if readErr != nil && !os.IsNotExist(readErr) {
+		http.Error(w, readErr.Error(), http.StatusInternalServerError)
+		return
+	}
+	merged := string(data)
+	if len(existing) > 0 {
+		merged, err = wg.MergeRedactedConfig(string(existing), string(data))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+	meta, err := wg.ValidateConfig(merged)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	path := s.wgConfigPath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(merged), 0o600); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	s.logs.Add("info", "wireguard config saved", path)
 	writeJSON(w, map[string]any{
 		"path":   path,
 		"exists": true,
-		"meta":   meta,
+		"config": wg.RedactConfig(merged),
+		"meta":   redactedWGMeta(meta),
 	})
+}
+
+func redactedWGMeta(meta wg.ConfigMeta) wg.ConfigMeta {
+	if meta.PeerPublicKey != "" {
+		meta.PeerPublicKey = wg.RedactedValue
+	}
+	return meta
 }

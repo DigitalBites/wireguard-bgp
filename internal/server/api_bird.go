@@ -62,6 +62,7 @@ func (s *Server) postBIRDConfig(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.cfg = cfg
 	s.mu.Unlock()
+	s.logs.Add("info", "bird config saved", birdConfigPath)
 	writeJSON(w, map[string]any{
 		"path":      birdConfigPath,
 		"appConfig": appConfigPath,
@@ -86,6 +87,7 @@ func (s *Server) getBIRDStatus(w http.ResponseWriter, r *http.Request) {
 func (s *Server) supervisorAction(w http.ResponseWriter, r *http.Request, action string) {
 	resp, err := s.supervisor.Call(r.Context(), action)
 	if err != nil {
+		s.logs.Add("error", "supervisor action failed", action+": "+err.Error())
 		writeJSONStatus(w, http.StatusServiceUnavailable, map[string]any{
 			"ok":     false,
 			"action": action,
@@ -94,5 +96,6 @@ func (s *Server) supervisorAction(w http.ResponseWriter, r *http.Request, action
 		})
 		return
 	}
+	s.logs.Add("info", "supervisor action completed", action)
 	writeJSON(w, resp)
 }

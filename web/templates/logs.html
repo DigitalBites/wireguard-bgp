@@ -13,7 +13,16 @@
     <h1>Logs</h1>
     <nav><a href="/">Dashboard</a><a href="/config">Config</a><a href="/diagnostics">Diagnostics</a><a class="active" href="/logs">Logs</a></nav>
   </header>
-  <main class="stack"><section class="panel"><h2>Application Logs</h2><pre>Log viewer pending.</pre></section></main>
+  <main class="stack">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Application Logs</h2>
+        <button type="button" class="secondary" id="refresh-logs">Refresh</button>
+      </div>
+      <ol id="app-logs" class="log-list"><li>Loading</li></ol>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
 </body>
 </html>
 {{ end }}

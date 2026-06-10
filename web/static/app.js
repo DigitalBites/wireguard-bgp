@@ -108,6 +108,20 @@ async function loadBirdConfig() {
   preview.textContent = body.generated || body.error || 'Incomplete BIRD settings';
 }
 
+async function loadWireGuardConfig() {
+  const textarea = document.querySelector('#wg-config');
+  const message = document.querySelector('#wg-message');
+  if (!textarea) return;
+  const res = await fetch('/api/wg/config');
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (message) message.textContent = body.error || 'Load failed';
+    return;
+  }
+  textarea.value = body.config || '';
+  if (message) message.textContent = body.exists ? 'Loaded with keys redacted' : 'No WireGuard config saved';
+}
+
 async function saveBirdConfig(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -143,18 +157,60 @@ async function saveWireGuardConfig() {
     message.textContent = await res.text();
     return;
   }
-  message.textContent = 'Saved';
+  const body = await res.json().catch(() => ({}));
+  textarea.value = body.config || textarea.value;
+  message.textContent = 'Saved with keys redacted';
+}
+
+async function loadLogs() {
+  const list = document.querySelector('#app-logs');
+  if (!list) return;
+  const res = await fetch('/api/logs');
+  const body = await res.json().catch(() => ({}));
+  list.replaceChildren();
+  if (!res.ok) {
+    const item = document.createElement('li');
+    item.textContent = body.error || 'Log load failed';
+    list.append(item);
+    return;
+  }
+  const entries = body.entries || [];
+  if (!entries.length) {
+    const item = document.createElement('li');
+    item.textContent = 'No log entries';
+    list.append(item);
+    return;
+  }
+  entries.slice().reverse().forEach((entry) => {
+    const item = document.createElement('li');
+    const meta = document.createElement('span');
+    const message = document.createElement('strong');
+    const detail = document.createElement('pre');
+    meta.textContent = `${entry.time || ''} ${entry.level || 'info'}`;
+    message.textContent = entry.message || '';
+    item.append(meta, message);
+    if (entry.detail) {
+      detail.textContent = entry.detail;
+      item.append(detail);
+    }
+    list.append(item);
+  });
 }
 
 document.querySelectorAll('[data-diag]').forEach(refreshDiag);
 refreshStatus();
+loadWireGuardConfig();
 loadBirdConfig();
+loadLogs();
 
 const birdForm = document.querySelector('#bird-form');
 if (birdForm) birdForm.addEventListener('submit', saveBirdConfig);
 
 const saveWG = document.querySelector('#save-wg');
 if (saveWG) saveWG.addEventListener('click', saveWireGuardConfig);
+
+const refreshLogs = document.querySelector('#refresh-logs');
+if (refreshLogs) refreshLogs.addEventListener('click', loadLogs);
 
 document.querySelectorAll('[data-routing-action]').forEach((button) => {
   button.addEventListener('click', () => runRoutingAction(button.dataset.routingAction));

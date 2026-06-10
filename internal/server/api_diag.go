@@ -8,6 +8,7 @@ func (s *Server) diagHandler(name string) http.HandlerFunc {
 		status := "ok"
 		if err != nil {
 			status = "error"
+			s.logs.Add("error", "diagnostic command failed", name+": "+err.Error())
 		}
 		writeJSON(w, map[string]any{
 			"name":   name,

@@ -262,6 +262,37 @@ button:disabled {
   color: var(--muted);
 }
 
+.log-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.log-list li {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 10px;
+  background: #fbfcfd;
+}
+
+.log-list span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.log-list strong {
+  font-size: 14px;
+}
+
+.log-list pre {
+  color: var(--muted);
+}
+
 pre {
   margin: 0;
   overflow: auto;

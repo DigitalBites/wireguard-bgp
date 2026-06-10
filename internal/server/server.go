@@ -20,6 +20,7 @@ type Server struct {
 	diag       diag.Runner
 	supervisor supervisor.Client
 	auth       *Auth
+	logs       *LogStore
 }
 
 func New(cfg config.App, templates embed.FS, static embed.FS) (*Server, error) {
@@ -49,6 +50,7 @@ func NewWithAuth(cfg config.App, templates embed.FS, static embed.FS, authConfig
 		diag:       diag.Runner{},
 		supervisor: supervisor.Client{},
 		auth:       auth,
+		logs:       NewLogStore(200),
 	}, nil
 }
 
@@ -67,6 +69,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /static/", http.FileServerFS(s.static))
 	mux.HandleFunc("GET /api/status", s.status)
 	mux.HandleFunc("GET /api/events", s.events)
+	mux.HandleFunc("GET /api/logs", s.getLogs)
 	mux.HandleFunc("GET /api/supervisor/status", s.supervisorStatus)
 	mux.HandleFunc("GET /api/wg/config", s.getWGConfig)
 	mux.HandleFunc("POST /api/wg/config", s.postWGConfig)

@@ -37,8 +37,10 @@ func (s *Server) routingAction(
 ) {
 	result := run(orchestrator.Routing{Client: s.supervisor})
 	if !result.OK {
+		s.logs.Add("error", "routing action failed", orchestrator.ActionSummary(result))
 		writeJSONStatus(w, http.StatusServiceUnavailable, result)
 		return
 	}
+	s.logs.Add("info", "routing action completed", orchestrator.ActionSummary(result))
 	writeJSON(w, result)
 }

@@ -20,6 +20,8 @@ type ConfigMeta struct {
 	PersistentKeepalive string   `json:"persistentKeepalive,omitempty"`
 }
 
+const RedactedValue = "***"
+
 func ParseConfig(input string) ConfigMeta {
 	var meta ConfigMeta
 	section := ""
@@ -59,6 +61,33 @@ func ParseConfig(input string) ConfigMeta {
 	return meta
 }
 
+func RedactConfig(input string) string {
+	return transformConfig(input, func(section, key, value string, occurrence int) string {
+		if isSensitiveDirective(section, key) && value != "" {
+			return RedactedValue
+		}
+		return value
+	})
+}
+
+func MergeRedactedConfig(existing, submitted string) (string, error) {
+	values := sensitiveValues(existing)
+	merged := transformConfig(submitted, func(section, key, value string, occurrence int) string {
+		if !isSensitiveDirective(section, key) || value != RedactedValue {
+			return value
+		}
+		existingValue := values[sensitiveKey(section, key, occurrence)]
+		if existingValue == "" {
+			return value
+		}
+		return existingValue
+	})
+	if strings.Contains(merged, "= "+RedactedValue) || strings.Contains(merged, "="+RedactedValue) {
+		return "", fmt.Errorf("redacted WireGuard key placeholder cannot be saved without an existing key")
+	}
+	return merged, nil
+}
+
 func ValidateConfig(input string) (ConfigMeta, error) {
 	meta := ParseConfig(input)
 	if !meta.HasPrivateKey || meta.PeerPublicKey == "" {
@@ -95,6 +124,79 @@ func ValidateConfig(input string) (ConfigMeta, error) {
 		return meta, err
 	}
 	return meta, nil
+}
+
+func transformConfig(input string, replace func(section, key, value string, occurrence int) string) string {
+	var out []string
+	section := ""
+	occurrences := map[string]int{}
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	for scanner.Scan() {
+		raw := scanner.Text()
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
+			out = append(out, raw)
+			continue
+		}
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			section = strings.ToLower(strings.TrimSpace(line[1 : len(line)-1]))
+			out = append(out, raw)
+			continue
+		}
+		key, value, ok := strings.Cut(raw, "=")
+		if !ok {
+			out = append(out, raw)
+			continue
+		}
+		trimmedKey := strings.ToLower(strings.TrimSpace(key))
+		occurrenceKey := section + "." + trimmedKey
+		occurrences[occurrenceKey]++
+		nextValue := replace(section, trimmedKey, strings.TrimSpace(value), occurrences[occurrenceKey])
+		out = append(out, key+"= "+nextValue)
+	}
+	return strings.TrimSpace(strings.Join(out, "\n")) + "\n"
+}
+
+func sensitiveValues(input string) map[string]string {
+	values := map[string]string{}
+	section := ""
+	occurrences := map[string]int{}
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") {
+			continue
+		}
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			section = strings.ToLower(strings.TrimSpace(line[1 : len(line)-1]))
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		trimmedKey := strings.ToLower(strings.TrimSpace(key))
+		if !isSensitiveDirective(section, trimmedKey) {
+			continue
+		}
+		occurrenceKey := section + "." + trimmedKey
+		occurrences[occurrenceKey]++
+		values[sensitiveKey(section, trimmedKey, occurrences[occurrenceKey])] = strings.TrimSpace(value)
+	}
+	return values
+}
+
+func isSensitiveDirective(section, key string) bool {
+	switch section + "." + key {
+	case "interface.privatekey", "peer.publickey", "peer.presharedkey":
+		return true
+	default:
+		return false
+	}
+}
+
+func sensitiveKey(section, key string, occurrence int) string {
+	return section + "." + key + "." + strconv.Itoa(occurrence)
 }
 
 func SetconfConfig(input string) string {
