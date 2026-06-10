@@ -118,12 +118,14 @@ func assertSupervisorStopped(t *testing.T, errCh <-chan error) {
 type serverSupervisorTestRunner struct {
 	name   string
 	args   []string
+	calls  []string
 	output string
 }
 
 func (r *serverSupervisorTestRunner) Run(ctx context.Context, name string, args ...string) (string, error) {
 	r.name = name
 	r.args = append([]string(nil), args...)
+	r.calls = append(r.calls, strings.TrimSpace(name+" "+strings.Join(args, " ")))
 	if r.output != "" {
 		return r.output, nil
 	}
@@ -132,6 +134,10 @@ func (r *serverSupervisorTestRunner) Run(ctx context.Context, name string, args 
 
 func (r *serverSupervisorTestRunner) commandLine() string {
 	return strings.TrimSpace(r.name + " " + strings.Join(r.args, " "))
+}
+
+func (r *serverSupervisorTestRunner) commandLines() []string {
+	return append([]string(nil), r.calls...)
 }
 
 func findCookie(cookies []*http.Cookie, name string) *http.Cookie {

@@ -143,6 +143,17 @@ func TestSupervisorBIRDStartRunsFixedCommand(t *testing.T) {
 	}
 }
 
+func TestSupervisorBIRDStopRunsFixedCommand(t *testing.T) {
+	runner := &recordingRunner{output: "stopped\n"}
+	resp := (Server{Runner: runner}).dispatch(Request{Action: ActionBIRDStop})
+	if !resp.OK {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+	if runner.name != "birdc" || strings.Join(runner.args, " ") != "-s /run/bird/bird.ctl down" {
+		t.Fatalf("unexpected command: %s %#v", runner.name, runner.args)
+	}
+}
+
 func TestSupervisorBIRDStatusRunsFixedCommand(t *testing.T) {
 	runner := &recordingRunner{output: "peplink BGP up\n"}
 	resp := (Server{Runner: runner}).dispatch(Request{Action: ActionBIRDStatus})

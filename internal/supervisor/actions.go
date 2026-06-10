@@ -8,6 +8,8 @@ func (s Server) dispatch(req Request) Response {
 		return Response{OK: true, Action: req.Action, Output: "pong"}
 	case ActionBIRDStart:
 		return s.startBIRD()
+	case ActionBIRDStop:
+		return s.stopBIRD()
 	case ActionBIRDReload:
 		return s.reloadBIRD()
 	case ActionBIRDStatus:

@@ -4,6 +4,10 @@ func (s Server) startBIRD() Response {
 	return s.runCommand(ActionBIRDStart, "bird", "-c", s.birdConfigPath(), "-s", s.birdSocketPath())
 }
 
+func (s Server) stopBIRD() Response {
+	return s.runCommand(ActionBIRDStop, "birdc", "-s", s.birdSocketPath(), "down")
+}
+
 func (s Server) reloadBIRD() Response {
 	return s.runCommand(ActionBIRDReload, "birdc", "-s", s.birdSocketPath(), "configure")
 }

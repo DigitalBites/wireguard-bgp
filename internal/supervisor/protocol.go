@@ -8,6 +8,7 @@ const (
 	DefaultBIRDSocketPath = "/run/bird/bird.ctl"
 	ActionPing            = "ping"
 	ActionBIRDStart       = "bird.start"
+	ActionBIRDStop        = "bird.stop"
 	ActionBIRDReload      = "bird.reload"
 	ActionBIRDStatus      = "bird.status"
 	ActionWGStart         = "wg.start"
