@@ -81,7 +81,7 @@ jobs:
           fi
 
   pr-build:
-    name: PR build ${{ matrix.arch }}
+    name: PR build image
     if: github.event_name == 'pull_request'
     needs: plan
     runs-on: ubuntu-24.04
@@ -150,6 +150,15 @@ jobs:
       matrix:
         arch: ${{ fromJSON(needs.plan.outputs.arches) }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4.1.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.1.0
+
       - name: Resolve arch metadata
         id: arch
         run: |
