@@ -15,6 +15,7 @@ type AuthConfig struct {
 	Token        string
 	SessionTTL   time.Duration
 	CookieSecure bool
+	BuildVersion string
 }
 
 type Auth struct {

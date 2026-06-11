@@ -69,6 +69,14 @@ nav a.active {
   margin: 24px auto;
 }
 
+.page-footer {
+  width: min(1280px, calc(100vw - 32px));
+  margin: -8px auto 16px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));

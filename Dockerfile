@@ -3,6 +3,7 @@ FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS build
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG APP_BUILD_VERSION
 
 WORKDIR /src
 
@@ -13,6 +14,8 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/peplink-wg-bgp ./cmd/peplink-wg-bgp
 
 FROM alpine:3.24
+
+ARG APP_BUILD_VERSION
 
 RUN apk add --no-cache \
     bird \
@@ -37,5 +40,6 @@ RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh
 EXPOSE 8080
 
 ENV APP_CONFIG=/app-state/app.yaml
+ENV APP_BUILD_VERSION=$APP_BUILD_VERSION
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
