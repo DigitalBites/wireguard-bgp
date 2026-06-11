@@ -157,7 +157,6 @@ Connecting to host 172.17.62.160, port 5201
 [  5]   0.00-10.07  sec   276 MBytes   230 Mbits/sec                 receiver
 
 iperf Done.
-# ip route add 172.17.62.160/32 via 192.168.50.1 dev eth0
 ```
 
 ## Status
