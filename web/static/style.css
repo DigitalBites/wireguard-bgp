@@ -41,6 +41,17 @@ h1 {
   font-size: 20px;
 }
 
+.page-title {
+  display: grid;
+  gap: 2px;
+}
+
+.build-info {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 h2 {
   font-size: 16px;
   margin-bottom: 14px;
@@ -67,14 +78,6 @@ nav a.active {
 .grid, .stack {
   width: min(1280px, calc(100vw - 32px));
   margin: 24px auto;
-}
-
-.page-footer {
-  width: min(1280px, calc(100vw - 32px));
-  margin: -8px auto 16px;
-  color: var(--muted);
-  font-size: 11px;
-  text-align: right;
 }
 
 .grid {

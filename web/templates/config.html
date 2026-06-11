@@ -10,7 +10,10 @@
 </head>
 <body>
   <header class="topbar">
-    <h1>Configuration</h1>
+    <div class="page-title">
+      <h1>Configuration</h1>
+      <p class="build-info">Build {{ .BuildVersion }}</p>
+    </div>
     <nav><a href="/">Dashboard</a><a class="active" href="/config">Config</a><a href="/diagnostics">Diagnostics</a><a href="/logs">Logs</a></nav>
   </header>
   <main class="stack">
@@ -45,7 +48,6 @@
       <pre id="bird-preview">Loading</pre>
     </section>
   </main>
-  <footer class="page-footer">Build {{ .BuildVersion }}</footer>
   <script src="/static/app.js"></script>
 </body>
 </html>
