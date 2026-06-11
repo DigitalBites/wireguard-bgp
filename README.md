@@ -1,10 +1,10 @@
-# Peplink WG BGP
+# WireGuard BGP - Router Companion
 
-Peplink WG BGP is a small containerized control plane for running a
-WireGuard tunnel and BGP routing peer from Peplink container hosting
-environments. It provides a lightweight web UI for importing WireGuard config,
-generating BIRD configuration, applying routing state, and checking tunnel and
-BGP status.
+WireGuard BGP is a small containerized control plane for running a
+`wireguard-go` tunnel on small mobile routers, such as Peplink devices that
+support containers. It provides a lightweight web UI for importing WireGuard
+config, generating BIRD configuration to advertise routes back to the router,
+applying routing state, and checking tunnel and BGP status.
 
 The current target is a Peplink device running a Linux container with
 `NET_ADMIN` and `/dev/net/tun` access. The app uses `wireguard-go`,
@@ -13,7 +13,50 @@ the network operations that require elevated privileges.
 
 ## Quick Start
 
-Coming soon.
+These steps are intended to get a tunnel up and running. They do not cover the
+full details of network routing, remote firewall rules, remote route
+advertisements, or endpoint design. You need a working WireGuard endpoint before
+starting.
+
+### Configure + Start Container
+
+1. Log in to your Peplink router.
+2. Navigate to Advanced > Edge Compute > Docker.
+3. Select "Click here to pull Docker image."
+4. Enter the desired image name. In this example, use `digitalbites/wireguard-bgp:v0.0.1-arm64-dev.22`.
+   ![Docker image pull](docs/images/peplink-docker-image-pull.png)
+5. Click Pull and wait for the image to install.
+6. Click "+" to add a new running container instance. When prompted for the Docker run command, use: `docker run -p 8080:8080 --name wireguard-bgp --cap-add NET_ADMIN --device /dev/net/tun --restart unless-stopped digitalbites/wireguard-bgp:v0.0.1-arm64-dev.22`
+   ![Docker image running](docs/images/peplink-docker-image-running.png)
+7. Copy the IP address from the updated screen.
+8. View the logs using the paper scroll icon and copy the login token.
+
+### Configure Tunnel + Route Advertisement
+
+1. Open a new browser tab and navigate to `http://<container-ip>:8080`, then enter the login token.
+2. Paste your WireGuard configuration in WireGuard, then click "Save WireGuard."
+3. Configure BIRD under Advertise Routes.
+4. Set Router ID to the container IP address. In this example, use `192.168.50.141`.
+5. Set Local ASN to `65060`, Peer ASN to `65001`, and Peer IP to your Peplink management/LAN IP. In this example, use `192.168.50.1`.
+6. Leave Interface set to `wg0`.
+7. For Advertised Routes, keep the example entry for all traffic or list specific subnets to route over the tunnel.
+8. Click "Save BIRD."
+9. Click Dashboard > Apply.
+
+### Configure Peplink BGP
+
+1. Log in to your Peplink router.
+2. Navigate to Advanced > Routing Protocols > BGP.
+3. Configure matching settings from the section above.
+   ![Peplink BGP Config](docs/images/peplink-bgp-config.png)
+
+### Confirm BGP Route Advertisement
+
+1. Log in to your Peplink router.
+2. Navigate to Status > BGP.
+   ![Peplink BGP Status](docs/images/peplink-bgp-status.png)
+
+### Test!
 
 ## Screenshots
 
@@ -168,6 +211,13 @@ to evolve.
 Tested hardware:
 
 - Peplink MAX Transit Duo Pro: Firmware 8.5.4 build 6264
+
+## Limitations
+
+- Performance may also be limited by the connection medium, such as cellular or
+  Starlink.
+- Only a single tunnel definition is currently supported.
+- Requires container runtime support on the router.
 
 ## Security Notes
 
