@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"peplink-wg-bgp/internal/buildinfo"
 	"peplink-wg-bgp/internal/config"
 	"peplink-wg-bgp/internal/orchestrator"
 	"peplink-wg-bgp/internal/server"
@@ -47,10 +48,12 @@ func runServe() {
 	if err != nil {
 		log.Fatalf("generate login token: %v", err)
 	}
+	buildVersion := buildinfo.FromEnv()
 	srv, err := server.NewWithAuth(cfg, web.Templates, web.Static, server.AuthConfig{
 		Token:        token,
 		SessionTTL:   time.Hour,
 		CookieSecure: os.Getenv("COOKIE_SECURE") == "true",
+		BuildVersion: buildVersion,
 	})
 	if err != nil {
 		log.Fatalf("create server: %v", err)
@@ -58,6 +61,7 @@ func runServe() {
 	log.Printf("login path: http://<router-or-container-host>/login")
 	log.Printf("login token: %s", srv.LoginToken())
 	log.Printf("login sessions expire after 1 hour")
+	log.Printf("build version: %s", srv.BuildVersion())
 	log.Printf("listening on %s", cfg.ListenAddr)
 	maybeAutoStart(cfg)
 	httpServer := &http.Server{

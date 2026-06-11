@@ -102,6 +102,7 @@ func TestDashboardIncludesRoutingControls(t *testing.T) {
 		`id="routing-steps"`,
 		`data-refresh-indicator`,
 		`data-refresh-age`,
+		`class="build-info">Build local-`,
 	} {
 		if !strings.Contains(rec.Body.String(), want) {
 			t.Fatalf("dashboard missing %q:\n%s", want, rec.Body.String())

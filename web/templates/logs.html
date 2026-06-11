@@ -10,7 +10,10 @@
 </head>
 <body>
   <header class="topbar">
-    <h1>Logs</h1>
+    <div class="page-title">
+      <h1>Logs</h1>
+      <p class="build-info">Build {{ .BuildVersion }}</p>
+    </div>
     <nav><a href="/">Dashboard</a><a href="/config">Config</a><a href="/diagnostics">Diagnostics</a><a class="active" href="/logs">Logs</a></nav>
   </header>
   <main class="stack">

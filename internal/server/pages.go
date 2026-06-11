@@ -9,10 +9,11 @@ import (
 func (s *Server) page(name string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := map[string]any{
-			"Title":     pageTitle(name),
-			"Active":    strings.TrimSuffix(name, ".html"),
-			"Generated": time.Now().UTC().Format(time.RFC3339),
-			"CSRFToken": s.auth.csrfToken(r),
+			"Title":        pageTitle(name),
+			"Active":       strings.TrimSuffix(name, ".html"),
+			"Generated":    time.Now().UTC().Format(time.RFC3339),
+			"CSRFToken":    s.auth.csrfToken(r),
+			"BuildVersion": s.buildVersion,
 		}
 		if err := s.templates.ExecuteTemplate(w, name, data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

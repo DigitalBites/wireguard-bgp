@@ -27,14 +27,17 @@ CREATED="${CREATED:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
 case "$CHANNEL" in
   dev)
+    BUILD_VERSION="${BASE_TAG_VERSION}-${ARCH}-dev.${BUILD_ID}"
     PRIMARY_TAG="${IMAGE_NAME}:${BASE_TAG_VERSION}-${ARCH}-dev.${BUILD_ID}"
     EXTRA_TAGS="${IMAGE_NAME}:dev-${SHORT_SHA}-${ARCH} ${IMAGE_NAME}:dev-${ARCH}"
     ;;
   release)
+    BUILD_VERSION="${TAG_VERSION}-${ARCH}"
     PRIMARY_TAG="${IMAGE_NAME}:${TAG_VERSION}-${ARCH}"
     EXTRA_TAGS="${IMAGE_NAME}:latest-${ARCH}"
     ;;
   local)
+    BUILD_VERSION="${APP_BUILD_VERSION:-}"
     PRIMARY_TAG="${IMAGE_NAME}:${TAG_VERSION}-${ARCH}-local"
     EXTRA_TAGS=""
     ;;
@@ -51,6 +54,10 @@ set -- docker buildx build \
   --label "org.opencontainers.image.revision=$SHORT_SHA" \
   --label "org.opencontainers.image.version=$TAG_VERSION" \
   --tag "$PRIMARY_TAG"
+
+if [ -n "${APP_BUILD_VERSION:-$BUILD_VERSION}" ]; then
+  set -- "$@" --build-arg "APP_BUILD_VERSION=${APP_BUILD_VERSION:-$BUILD_VERSION}"
+fi
 
 for tag in $EXTRA_TAGS; do
   set -- "$@" --tag "$tag"

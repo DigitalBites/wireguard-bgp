@@ -7,20 +7,22 @@ import (
 	"sync"
 	"time"
 
+	"peplink-wg-bgp/internal/buildinfo"
 	"peplink-wg-bgp/internal/config"
 	"peplink-wg-bgp/internal/diag"
 	"peplink-wg-bgp/internal/supervisor"
 )
 
 type Server struct {
-	cfg        config.App
-	mu         sync.RWMutex
-	templates  *template.Template
-	static     embed.FS
-	diag       diag.Runner
-	supervisor supervisor.Client
-	auth       *Auth
-	logs       *LogStore
+	cfg          config.App
+	mu           sync.RWMutex
+	templates    *template.Template
+	static       embed.FS
+	diag         diag.Runner
+	supervisor   supervisor.Client
+	auth         *Auth
+	logs         *LogStore
+	buildVersion string
 }
 
 func New(cfg config.App, templates embed.FS, static embed.FS) (*Server, error) {
@@ -43,19 +45,25 @@ func NewWithAuth(cfg config.App, templates embed.FS, static embed.FS, authConfig
 	if err != nil {
 		return nil, err
 	}
+	buildVersion := buildinfo.Resolve(authConfig.BuildVersion, time.Now().UTC())
 	return &Server{
-		cfg:        cfg,
-		templates:  tpl,
-		static:     static,
-		diag:       diag.Runner{},
-		supervisor: supervisor.Client{},
-		auth:       auth,
-		logs:       NewLogStore(200),
+		cfg:          cfg,
+		templates:    tpl,
+		static:       static,
+		diag:         diag.Runner{},
+		supervisor:   supervisor.Client{},
+		auth:         auth,
+		logs:         NewLogStore(200),
+		buildVersion: buildVersion,
 	}, nil
 }
 
 func (s *Server) LoginToken() string {
 	return s.auth.loginToken
+}
+
+func (s *Server) BuildVersion() string {
+	return s.buildVersion
 }
 
 func (s *Server) Handler() http.Handler {
