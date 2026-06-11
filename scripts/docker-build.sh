@@ -9,6 +9,11 @@ cd "$ROOT_DIR"
 
 IMAGE_NAME="${IMAGE_NAME:-digitalbites/wireguard-bgp}"
 GO_VERSION="${GO_VERSION:?GO_VERSION must be set by ./scripts/ci-versions.env}"
+WIREGUARD_GO_VERSION="${WIREGUARD_GO_VERSION:?WIREGUARD_GO_VERSION must be set by ./scripts/ci-versions.env}"
+WIREGUARD_GO_SOURCE="${WIREGUARD_GO_SOURCE:?WIREGUARD_GO_SOURCE must be set by ./scripts/ci-versions.env}"
+WIREGUARD_GO_X_CRYPTO_VERSION="${WIREGUARD_GO_X_CRYPTO_VERSION:?WIREGUARD_GO_X_CRYPTO_VERSION must be set by ./scripts/ci-versions.env}"
+WIREGUARD_GO_X_NET_VERSION="${WIREGUARD_GO_X_NET_VERSION:?WIREGUARD_GO_X_NET_VERSION must be set by ./scripts/ci-versions.env}"
+WIREGUARD_GO_X_SYS_VERSION="${WIREGUARD_GO_X_SYS_VERSION:?WIREGUARD_GO_X_SYS_VERSION must be set by ./scripts/ci-versions.env}"
 CHANNEL="${CHANNEL:-local}"
 BASE_VERSION="${BASE_VERSION:-$(./scripts/resolve-version.sh)}"
 VERSION="${VERSION:-$BASE_VERSION}"
@@ -50,6 +55,11 @@ esac
 set -- docker buildx build \
   --platform "$PLATFORM" \
   --build-arg "GO_VERSION=$GO_VERSION" \
+  --build-arg "WIREGUARD_GO_VERSION=$WIREGUARD_GO_VERSION" \
+  --build-arg "WIREGUARD_GO_SOURCE=$WIREGUARD_GO_SOURCE" \
+  --build-arg "WIREGUARD_GO_X_CRYPTO_VERSION=$WIREGUARD_GO_X_CRYPTO_VERSION" \
+  --build-arg "WIREGUARD_GO_X_NET_VERSION=$WIREGUARD_GO_X_NET_VERSION" \
+  --build-arg "WIREGUARD_GO_X_SYS_VERSION=$WIREGUARD_GO_X_SYS_VERSION" \
   --label "org.opencontainers.image.created=$CREATED" \
   --label "org.opencontainers.image.revision=$SHORT_SHA" \
   --label "org.opencontainers.image.version=$TAG_VERSION" \
