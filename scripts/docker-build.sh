@@ -17,10 +17,19 @@ WIREGUARD_GO_X_SYS_VERSION="${WIREGUARD_GO_X_SYS_VERSION:?WIREGUARD_GO_X_SYS_VER
 CHANNEL="${CHANNEL:-local}"
 BASE_VERSION="${BASE_VERSION:-$(./scripts/resolve-version.sh)}"
 VERSION="${VERSION:-$BASE_VERSION}"
-TAG_VERSION="${VERSION#v}"
-TAG_VERSION="v${TAG_VERSION}"
-BASE_TAG_VERSION="${BASE_VERSION#v}"
-BASE_TAG_VERSION="v${BASE_TAG_VERSION}"
+semver_pattern='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+TAG_VERSION_VALUE="${VERSION#v}"
+BASE_TAG_VERSION_VALUE="${BASE_VERSION#v}"
+if ! printf '%s\n' "$TAG_VERSION_VALUE" | grep -Eq "$semver_pattern"; then
+  printf 'VERSION must be X.Y.Z or X.Y.Z-prerelease, got: %s\n' "$VERSION" >&2
+  exit 2
+fi
+if ! printf '%s\n' "$BASE_TAG_VERSION_VALUE" | grep -Eq "$semver_pattern"; then
+  printf 'BASE_VERSION must be X.Y.Z or X.Y.Z-prerelease, got: %s\n' "$BASE_VERSION" >&2
+  exit 2
+fi
+TAG_VERSION="v${TAG_VERSION_VALUE}"
+BASE_TAG_VERSION="v${BASE_TAG_VERSION_VALUE}"
 PLATFORM="${PLATFORM:-linux/amd64}"
 ARCH="${ARCH:-${PLATFORM##*/}}"
 PUSH="${PUSH:-false}"
@@ -39,7 +48,11 @@ case "$CHANNEL" in
   release)
     BUILD_VERSION="${TAG_VERSION}-${ARCH}"
     PRIMARY_TAG="${IMAGE_NAME}:${TAG_VERSION}-${ARCH}"
-    EXTRA_TAGS="${IMAGE_NAME}:latest-${ARCH}"
+    EXTRA_TAGS=""
+    case "$TAG_VERSION_VALUE" in
+      *-*) ;;
+      *) EXTRA_TAGS="${IMAGE_NAME}:latest-${ARCH}" ;;
+    esac
     ;;
   local)
     BUILD_VERSION="${APP_BUILD_VERSION:-}"

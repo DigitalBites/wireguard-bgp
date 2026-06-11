@@ -8,12 +8,20 @@ cd "$ROOT_DIR"
 . ./scripts/ci-versions.env
 
 tag="${GITHUB_REF_NAME:-}"
-if [ "${GITHUB_REF_TYPE:-}" = "tag" ] && printf '%s\n' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+semver_tag_pattern='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+stable_tag_pattern='^v[0-9]+\.[0-9]+\.[0-9]+$'
+
+if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+  if ! printf '%s\n' "$tag" | grep -Eq "$semver_tag_pattern"; then
+    printf 'invalid release tag: %s\n' "$tag" >&2
+    printf 'expected vX.Y.Z or vX.Y.Z-prerelease, for example v0.1.0 or v0.1.0-beta.1\n' >&2
+    exit 2
+  fi
   printf '%s\n' "${tag#v}"
   exit 0
 fi
 
-latest_tag="$(git tag --merged HEAD --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null | head -n 1 || true)"
+latest_tag="$(git tag --merged HEAD --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null | grep -E "$stable_tag_pattern" | head -n 1 || true)"
 if [ -z "$latest_tag" ]; then
   printf '%s\n' "$INITIAL_VERSION"
   exit 0
