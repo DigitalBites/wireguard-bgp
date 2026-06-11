@@ -18,7 +18,7 @@ on:
           - dev
           - release
       version:
-        description: Version without arch suffix, for example 0.1.0
+        description: Version without arch suffix, for example 0.1.0 or 0.1.0-beta.1
         required: false
         default: ""
       arches:
