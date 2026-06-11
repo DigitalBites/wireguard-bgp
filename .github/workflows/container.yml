@@ -140,7 +140,7 @@ jobs:
         run: ./scripts/image-scan.sh
 
   publish:
-    name: Publish ${{ matrix.arch }}
+    name: Publish image
     if: github.event_name != 'pull_request'
     needs: plan
     runs-on: ubuntu-24.04
