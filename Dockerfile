@@ -17,7 +17,8 @@ FROM alpine:3.24
 
 ARG APP_BUILD_VERSION
 
-RUN apk add --no-cache \
+RUN apk upgrade --no-cache && \
+    apk add --no-cache \
     bird \
     ca-certificates \
     iproute2 \
